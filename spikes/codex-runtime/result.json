@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-08-25T09:55:46Z",
+  "finished_at": "2026-08-25T09:56:32Z",
+  "platform": "darwin/arm64",
+  "codex_version": "codex-cli 0.149.0-alpha.4.3",
+  "auth_bridge": "host_auth_json_symlink",
+  "runs_required": 3,
+  "runs": [
+    {
+      "run": 1,
+      "duration": "18.59s",
+      "checks": [
+        {
+          "name": "auth_mount",
+          "passed": true,
+          "detail": "只映射宿主 auth.json；未复制宿主配置目录"
+        },
+        {
+          "name": "authentication",
+          "passed": true,
+          "detail": "Logged in using ChatGPT"
+        },
+        {
+          "name": "personal_skills",
+          "passed": true,
+          "detail": "模型输入中未发现已知个人 Skill 标记"
+        },
+        {
+          "name": "personal_mcp",
+          "passed": true,
+          "detail": "No MCP servers configured yet. Try `codex mcp add my-tool -- my-command`."
+        },
+        {
+          "name": "codex_exec",
+          "passed": true,
+          "detail": "codex exec 成功；工作区探针=\"allowed-77d349366f9119f7\"，外部探针=\"BLOCKED\""
+        },
+        {
+          "name": "other_repository_isolation",
+          "passed": true,
+          "detail": "工作区内文件可读，工作区外随机探针被阻止"
+        },
+        {
+          "name": "history_isolation",
+          "passed": true,
+          "detail": "未导入宿主历史、未生成会话历史文件；Codex 只在本轮隔离目录中新建了自身状态数据库"
+        },
+        {
+          "name": "clean_home",
+          "passed": true,
+          "detail": "隔离 HOME 中不存在个人 .agents 或 .codex 目录"
+        }
+      ]
+    },
+    {
+      "run": 2,
+      "duration": "13.297s",
+      "checks": [
+        {
+          "name": "auth_mount",
+          "passed": true,
+          "detail": "只映射宿主 auth.json；未复制宿主配置目录"
+        },
+        {
+          "name": "authentication",
+          "passed": true,
+          "detail": "Logged in using ChatGPT"
+        },
+        {
+          "name": "personal_skills",
+          "passed": true,
+          "detail": "模型输入中未发现已知个人 Skill 标记"
+        },
+        {
+          "name": "personal_mcp",
+          "passed": true,
+          "detail": "No MCP servers configured yet. Try `codex mcp add my-tool -- my-command`."
+        },
+        {
+          "name": "codex_exec",
+          "passed": true,
+          "detail": "codex exec 成功；工作区探针=\"allowed-62655e952a046157\"，外部探针=\"BLOCKED\""
+        },
+        {
+          "name": "other_repository_isolation",
+          "passed": true,
+          "detail": "工作区内文件可读，工作区外随机探针被阻止"
+        },
+        {
+          "name": "history_isolation",
+          "passed": true,
+          "detail": "未导入宿主历史、未生成会话历史文件；Codex 只在本轮隔离目录中新建了自身状态数据库"
+        },
+        {
+          "name": "clean_home",
+          "passed": true,
+          "detail": "隔离 HOME 中不存在个人 .agents 或 .codex 目录"
+        }
+      ]
+    },
+    {
+      "run": 3,
+      "duration": "13.516s",
+      "checks": [
+        {
+          "name": "auth_mount",
+          "passed": true,
+          "detail": "只映射宿主 auth.json；未复制宿主配置目录"
+        },
+        {
+          "name": "authentication",
+          "passed": true,
+          "detail": "Logged in using ChatGPT"
+        },
+        {
+          "name": "personal_skills",
+          "passed": true,
+          "detail": "模型输入中未发现已知个人 Skill 标记"
+        },
+        {
+          "name": "personal_mcp",
+          "passed": true,
+          "detail": "No MCP servers configured yet. Try `codex mcp add my-tool -- my-command`."
+        },
+        {
+          "name": "codex_exec",
+          "passed": true,
+          "detail": "codex exec 成功；工作区探针=\"allowed-39db9a3373eb91ca\"，外部探针=\"BLOCKED\""
+        },
+        {
+          "name": "other_repository_isolation",
+          "passed": true,
+          "detail": "工作区内文件可读，工作区外随机探针被阻止"
+        },
+        {
+          "name": "history_isolation",
+          "passed": true,
+          "detail": "未导入宿主历史、未生成会话历史文件；Codex 只在本轮隔离目录中新建了自身状态数据库"
+        },
+        {
+          "name": "clean_home",
+          "passed": true,
+          "detail": "隔离 HOME 中不存在个人 .agents 或 .codex 目录"
+        }
+      ]
+    }
+  ],
+  "decision": "isolated_runtime",
+  "summary": "3 次冷启动全部通过：MVP 可以使用干净 HOME/CODEX_HOME，仅复用宿主认证"
+}
