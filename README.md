@@ -9,7 +9,8 @@ PeerContext 让一个本地 Codex 向另一个开发者机器上的 Codex 请求
 
 CLI 不理解请求内容、不读取代码、不规划任务，也不修改提示词。Skill 未安装时 CLI 必须完整可用；Skill 不参与 Relay 或提供端 Codex 的运行。
 
-当前状态：Runtime Spike 已通过，最终 PRD 已冻结，准备进入 MVP 开发。
+当前状态：Runtime Spike 已通过，最终 PRD 已冻结，M1 仓库骨架和公共契约已建立。当前 CLI 只开放用于验证契约的 `peerctx version`；Project、Relay 与 Agent 功能从 M2 开始实现。
 
 - [最终 PRD](./docs/PRD.md)
 - [Runtime Spike 结果](./spikes/codex-runtime/RESULT.md)
+- [CLI JSON 与退出码契约](./docs/CLI_CONTRACT.md)
