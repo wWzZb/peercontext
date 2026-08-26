@@ -10,7 +10,7 @@
 | 作者 | wuzhibo / Codex |
 | 仓库 | `/Users/wuzhibo/peercontext` |
 | Go module | `github.com/wWzZb/peercontext` |
-| npm package | `@wwzzb/peerctx` |
+| npm package | `peerctx` |
 | CLI | `peerctx` |
 | Skill | `peer-context` |
 | License | MIT |
@@ -579,7 +579,7 @@ Agent 调用默认 JSON；运维命令可选 `--format text`。
 | 系统钥匙串 | 默认 token 保存 | 失败时只允许用户显式选择 0600 文件 |
 | TLS | Relay 传输 | 非 localhost 部署必须启用 |
 | Go | CLI/Relay | 单二进制和跨平台构建 |
-| npm wrapper | `@wwzzb/peerctx` | 与 Go 二进制和 Skill 同 SemVer |
+| npm wrapper | `peerctx` | 与 Go 二进制和 Skill 同 SemVer |
 
 ### 风险
 
@@ -659,7 +659,7 @@ Agent 调用默认 JSON；运维命令可选 `--format text`。
 
 - 显式触发的 `peer-context` Skill；
 - Skill 文本嵌入与 `skills list/read`；
-- `@wwzzb/peerctx` 包装器；
+- `peerctx` npm 包装器；
 - 版本同步 CI；
 - 10 个试点 Case、最终真实 Codex smoke test和跨平台构建。
 

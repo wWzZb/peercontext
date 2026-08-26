@@ -12,7 +12,7 @@ const readme = fs.readFileSync(path.join(root, "README.md"), "utf8");
 
 test("AI installation guide stays short and aligned with the packaged CLI and Skill", () => {
   assert.ok(packageJSON.files.includes("INSTALL.md"), "npm package must include the AI installation guide");
-  assert.match(guide, new RegExp(`npm install -g @wwzzb/peerctx@${packageJSON.version.replaceAll(".", "\\.")}`));
+  assert.match(guide, new RegExp(`npm install -g ${packageJSON.name}@${packageJSON.version.replaceAll(".", "\\.")}`));
   assert.match(guide, /skills add https:\/\/wwzzb\.github\.io\/peercontext --skill peer-context --agent codex -g -y/);
   assert.match(guide, /peerctx version/);
   assert.match(guide, /peerctx skills list/);

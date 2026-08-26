@@ -164,4 +164,4 @@ peerctx doctor
 
 `doctor` 以无 token、无本地路径的结构化 checks 验证已门禁平台、固定 Codex 版本、`auth.json` 桥接、Permission Profile、credential 存储、Relay TLS/health、Git 仓库和保留 worktree。任一阻塞检查失败时返回非零和 `error.details`；`agent serve` 同样拒绝未门禁平台，不存在完整宿主环境回退。
 
-`@wwzzb/peerctx` 只是同版本 Go 二进制的平台包装。内置二进制必须通过 SHA-256 manifest 校验；Node 层不解析命令、stdin、正文或回答。
+`peerctx` npm 包只是同版本 Go 二进制的平台包装。内置二进制必须通过 SHA-256 manifest 校验；Node 层不解析命令、stdin、正文或回答。
