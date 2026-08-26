@@ -22,6 +22,62 @@ func TestRequestValidatesRawBodyHash(t *testing.T) {
 	}
 }
 
+func TestProviderMessageRoundTripPreservesBinaryRequestBytes(t *testing.T) {
+	body := []byte{'r', 'a', 'w', '\r', '\n', 0, 0xff}
+	now := time.Now().UTC()
+	request := Request{SchemaVersion: 1, ID: "req_binary", ProjectID: "prj_test", RequesterID: "mem_test", AgentID: "agt_test", Mode: ModeRead, Body: body, BodySHA256: BodySHA256(body), CreatedAt: now}
+	message := ProviderMessage{SchemaVersion: 1, Type: ProviderRequest, Request: &request}
+	encoded, err := json.Marshal(message)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded ProviderMessage
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if err := decoded.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	if !bytes.Equal(decoded.Request.Body, body) {
+		t.Fatalf("body = %v, want %v", decoded.Request.Body, body)
+	}
+}
+
+func TestWriteProviderMessageRequiresExplicitCommitAndResponseHidesLocalPath(t *testing.T) {
+	request := validRequest([]byte("write bytes"), time.Now().UTC())
+	request.Mode = ModeWrite
+	message := ProviderMessage{SchemaVersion: 1, Type: ProviderRequest, Request: &request}
+	if err := message.Validate(); err == nil {
+		t.Fatal("write provider message without base_commit was accepted")
+	}
+	message.BaseCommit = "0123456789abcdef"
+	if err := message.Validate(); err != nil {
+		t.Fatalf("write provider message: %v", err)
+	}
+	worktree := WorktreeResult{SchemaVersion: 1, ID: "wt_test", AgentID: request.AgentID, RequestID: request.ID, BaseCommit: message.BaseCommit}
+	response := Response{SchemaVersion: 1, RequestID: request.ID, Status: StatusSucceeded, Answer: []byte("done"), Worktree: &worktree}
+	if err := response.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	encoded, _ := json.Marshal(response)
+	for _, forbidden := range []string{"repository", "path", "/Users/", "git_common_dir"} {
+		if bytes.Contains(encoded, []byte(forbidden)) {
+			t.Fatalf("write response contains local path field %q: %s", forbidden, encoded)
+		}
+	}
+}
+
+func TestFailureCannotValidateAsSuccessfulResponse(t *testing.T) {
+	failure := ProviderMessage{SchemaVersion: 1, Type: ProviderFailure, Failure: &RequestFailure{SchemaVersion: 1, RequestID: "req_failed", Code: "codex_runtime_failed", Message: "Codex failed."}}
+	if err := failure.Validate(); err != nil {
+		t.Fatalf("failure Validate: %v", err)
+	}
+	failure.Type = ProviderResponse
+	if err := failure.Validate(); err == nil {
+		t.Fatal("failure payload validated as a successful response")
+	}
+}
+
 func TestRequestRejectsChangedBody(t *testing.T) {
 	now := time.Date(2026, 8, 25, 8, 0, 0, 0, time.UTC)
 	request := validRequest([]byte("line one\r\nline two"), now)

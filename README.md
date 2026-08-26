@@ -9,8 +9,13 @@ PeerContext 让一个本地 Codex 向另一个开发者机器上的 Codex 请求
 
 CLI 不理解请求内容、不读取代码、不规划任务，也不修改提示词。Skill 未安装时 CLI 必须完整可用；Skill 不参与 Relay 或提供端 Codex 的运行。
 
-当前状态：Runtime Spike 已通过，最终 PRD 已冻结，M1 仓库骨架和公共契约已建立。当前 CLI 只开放用于验证契约的 `peerctx version`；Project、Relay 与 Agent 功能从 M2 开始实现。
+当前实现已覆盖 M1–M5：Project/身份/Agent/Relay、read 请求、双边批准的 write、detached worktree、显式 `peer-context` Skill、`doctor`、npm 薄包装和跨平台构建自动化。CLI 在未安装 Skill 时仍可完成全部核心流程。
+
+read/write 正文经 HTTP + WebSocket/WSS 在内存中转，提供端使用固定门禁版本的 `isolated_runtime`。Relay 只保存大小、SHA-256、身份、状态和时间；仓库路径只保存在 Agent 所在机器的本地配置中。write 需要请求端确认和提供端逐次批准，只在明确 commit 的 detached worktree 中执行，不自动 commit、merge 或 push。
 
 - [最终 PRD](./docs/PRD.md)
 - [Runtime Spike 结果](./spikes/codex-runtime/RESULT.md)
 - [CLI JSON 与退出码契约](./docs/CLI_CONTRACT.md)
+- [M3 Read 链路](./docs/M3_READ.md)
+- [M4 Write 链路](./docs/M4_WRITE.md)
+- [M5 自动化试点记录](./docs/PILOT_RESULTS.md)

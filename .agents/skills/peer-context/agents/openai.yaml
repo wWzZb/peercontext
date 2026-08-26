@@ -1,0 +1,7 @@
+interface:
+  display_name: "PeerContext"
+  short_description: "Ask another private repository's local Codex"
+  default_prompt: "Use $peer-context to obtain the missing cross-repository fact with the smallest necessary request."
+
+policy:
+  allow_implicit_invocation: false

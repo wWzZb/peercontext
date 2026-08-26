@@ -50,7 +50,15 @@ type Error struct {
 	Message   string `json:"message"`
 	Hint      string `json:"hint"`
 	Retryable bool   `json:"retryable"`
+	Details   any    `json:"details,omitempty"`
 	exitCode  ExitCode
+}
+
+// WithDetails attaches structured machine data to a non-success state such as
+// the mandatory requester write confirmation. It never changes the exit code.
+func (e Error) WithDetails(details any) Error {
+	e.Details = details
+	return e
 }
 
 // ErrorEnvelope is the only top-level shape written to stderr on failure.

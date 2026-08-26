@@ -20,9 +20,91 @@ jobs:
         run: test -z "$(gofmt -l .)"
       - name: Test
         run: go test ./...
+      - name: Race test
+        run: go test -race ./...
       - name: Vet
         run: go vet ./...
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Test npm wrapper and version sync
+        run: npm test
       - name: Build CLI
         run: go build ./cmd/peerctx
       - name: Check whitespace
         run: git diff --check "$(git hash-object -t tree /dev/null)" HEAD
+
+  cross-build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+            platform: darwin
+            binary: peerctx
+          - goos: darwin
+            goarch: amd64
+            platform: darwin
+            binary: peerctx
+          - goos: linux
+            goarch: arm64
+            platform: linux
+            binary: peerctx
+          - goos: linux
+            goarch: amd64
+            platform: linux
+            binary: peerctx
+          - goos: windows
+            goarch: arm64
+            platform: win32
+            binary: peerctx.exe
+          - goos: windows
+            goarch: amd64
+            platform: win32
+            binary: peerctx.exe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Cross-build CLI
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          package_arch="${GOARCH/amd64/x64}"
+          target="package/vendor/${{ matrix.platform }}-${package_arch}"
+          mkdir -p "${target}"
+          go build -trimpath -o "${target}/${{ matrix.binary }}" ./cmd/peerctx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: peerctx-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: package/vendor
+          if-no-files-found: error
+
+  package:
+    runs-on: ubuntu-latest
+    needs: [test, cross-build]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: peerctx-*
+          path: vendor
+          merge-multiple: true
+      - name: Generate and verify binary checksums
+        run: |
+          node scripts/generate-checksums.js
+          node scripts/verify-package.js
+      - name: Verify npm package contents
+        run: npm pack --dry-run

@@ -2,6 +2,7 @@
 package cli
 
 import (
+	"context"
 	"io"
 
 	"github.com/wWzZb/peercontext/internal/version"
@@ -18,11 +19,9 @@ type VersionData struct {
 }
 
 // Run executes peerctx and returns its process exit code. stdin is kept as a
-// separate stream so future ask/task commands can forward bytes without
-// turning them into command arguments or strings.
+// separate stream so ask/task forward bytes without turning them into command
+// arguments or strings.
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) clioutput.ExitCode {
-	_ = stdin
-
 	if len(args) == 1 && (args[0] == "version" || args[0] == "--version") {
 		data := VersionData{
 			SchemaVersion: protocolv1.SchemaVersion,
@@ -34,6 +33,11 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) clioutput.Exi
 			return clioutput.ExitInternal
 		}
 		return clioutput.ExitOK
+	}
+	if len(args) > 0 {
+		if handled, code := runM2(context.Background(), args, stdin, stdout, stderr); handled {
+			return code
+		}
 	}
 
 	apiErr := clioutput.NewError(

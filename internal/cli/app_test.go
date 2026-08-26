@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/wWzZb/peercontext/internal/version"
@@ -76,5 +77,55 @@ func TestUnknownCommandWritesStructuredErrorOnlyToStderr(t *testing.T) {
 	}
 	if envelope.Error.Retryable {
 		t.Fatal("retryable = true, want false")
+	}
+}
+
+func TestRelayConnectionFailureUsesTransportExitCode(t *testing.T) {
+	t.Setenv("PEERCTX_CONFIG_DIR", t.TempDir())
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	exitCode := Run([]string{"project", "create", "--relay", "http://127.0.0.1:1", "--name", "test", "--owner", "alice", "--credential-file", t.TempDir() + "/credential"}, bytes.NewReader(nil), &stdout, &stderr)
+	if exitCode != clioutput.ExitConnection {
+		t.Fatalf("exit code = %d, want %d; stderr=%s", exitCode, clioutput.ExitConnection, stderr.String())
+	}
+	var envelope clioutput.ErrorEnvelope
+	if err := json.Unmarshal(stderr.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.Error.Code != "relay_connection_failed" || !envelope.Error.Retryable {
+		t.Fatalf("error = %#v", envelope.Error)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
+func TestSkillsListAndReadExposeVersionMatchedExplicitBundle(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	if code := Run([]string{"skills", "list"}, strings.NewReader(""), &stdout, &stderr); code != clioutput.ExitOK {
+		t.Fatalf("skills list code=%d stderr=%s", code, stderr.String())
+	}
+	var list struct {
+		Data struct {
+			Skills []struct {
+				Name     string   `json:"name"`
+				Version  string   `json:"version"`
+				Files    []string `json:"files"`
+				Implicit bool     `json:"implicit_invocation"`
+			} `json:"skills"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &list); err != nil {
+		t.Fatal(err)
+	}
+	if len(list.Data.Skills) != 1 || list.Data.Skills[0].Name != "peer-context" || list.Data.Skills[0].Version != version.Current || list.Data.Skills[0].Implicit || len(list.Data.Skills[0].Files) != 5 {
+		t.Fatalf("skills list = %#v", list)
+	}
+	stdout.Reset()
+	if code := Run([]string{"skills", "read", "peer-context", "--file", "agents/openai.yaml"}, strings.NewReader(""), &stdout, &stderr); code != clioutput.ExitOK {
+		t.Fatalf("skills read code=%d stderr=%s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "allow_implicit_invocation: false") {
+		t.Fatalf("skills read = %s", stdout.String())
 	}
 }

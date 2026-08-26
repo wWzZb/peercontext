@@ -1,0 +1,23 @@
+{
+  "name": "@wwzzb/peerctx",
+  "version": "0.1.0",
+  "description": "Thin platform wrapper for the PeerContext CLI",
+  "license": "MIT",
+  "bin": {
+    "peerctx": "bin/peerctx.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "vendor/",
+    "checksums.json",
+    ".agents/skills/peer-context/"
+  ],
+  "scripts": {
+	"test": "node scripts/check-version-sync.js && node --test npm-test/*.test.js",
+    "prepack": "node scripts/verify-package.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

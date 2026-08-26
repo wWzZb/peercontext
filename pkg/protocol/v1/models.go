@@ -226,10 +226,140 @@ func (r Request) Metadata(status RequestStatus, updatedAt time.Time) RequestMeta
 // Response carries the exact final Codex message bytes. Infrastructure errors
 // use the CLI error envelope instead of this answer field.
 type Response struct {
-	SchemaVersion int           `json:"schema_version"`
-	RequestID     string        `json:"request_id"`
-	Status        RequestStatus `json:"status"`
-	Answer        []byte        `json:"answer"`
+	SchemaVersion int             `json:"schema_version"`
+	RequestID     string          `json:"request_id"`
+	Status        RequestStatus   `json:"status"`
+	Answer        []byte          `json:"answer"`
+	Worktree      *WorktreeResult `json:"worktree,omitempty"`
+}
+
+// WorktreeResult is safe to return through Relay. The provider-local checkout
+// path and source repository path deliberately never enter the wire model.
+type WorktreeResult struct {
+	SchemaVersion int    `json:"schema_version"`
+	ID            string `json:"worktree_id"`
+	AgentID       string `json:"agent_id"`
+	RequestID     string `json:"request_id"`
+	BaseCommit    string `json:"base_commit"`
+}
+
+func (w WorktreeResult) Validate() error {
+	if err := validateSchema(w.SchemaVersion); err != nil {
+		return err
+	}
+	for name, value := range map[string]string{"worktree_id": w.ID, "agent_id": w.AgentID, "request_id": w.RequestID, "base_commit": w.BaseCommit} {
+		if strings.TrimSpace(value) == "" {
+			return fmt.Errorf("%s is required", name)
+		}
+	}
+	return nil
+}
+
+// RequestFailure is an infrastructure failure from the provider or Relay. It
+// is intentionally separate from Response so a failed invocation can never be
+// mistaken for a Codex answer.
+type RequestFailure struct {
+	SchemaVersion int    `json:"schema_version"`
+	RequestID     string `json:"request_id"`
+	Code          string `json:"code"`
+	Message       string `json:"message"`
+	Retryable     bool   `json:"retryable"`
+}
+
+func (f RequestFailure) Validate() error {
+	if err := validateSchema(f.SchemaVersion); err != nil {
+		return err
+	}
+	if strings.TrimSpace(f.RequestID) == "" {
+		return errors.New("request_id is required")
+	}
+	if strings.TrimSpace(f.Code) == "" {
+		return errors.New("failure code is required")
+	}
+	if strings.TrimSpace(f.Message) == "" {
+		return errors.New("failure message is required")
+	}
+	return nil
+}
+
+type ProviderMessageType string
+
+const (
+	ProviderReady    ProviderMessageType = "ready"
+	ProviderPing     ProviderMessageType = "ping"
+	ProviderPong     ProviderMessageType = "pong"
+	ProviderRequest  ProviderMessageType = "request"
+	ProviderResponse ProviderMessageType = "response"
+	ProviderFailure  ProviderMessageType = "failure"
+	ProviderCancel   ProviderMessageType = "cancel"
+)
+
+// ProviderMessage is the only Agent serve WebSocket frame shape. Exactly one
+// request/response/failure payload is present for the corresponding type.
+type ProviderMessage struct {
+	SchemaVersion int                 `json:"schema_version"`
+	Type          ProviderMessageType `json:"type"`
+	AgentID       string              `json:"agent_id,omitempty"`
+	RuntimeMode   RuntimeMode         `json:"runtime_mode,omitempty"`
+	RequestID     string              `json:"request_id,omitempty"`
+	BaseCommit    string              `json:"base_commit,omitempty"`
+	Request       *Request            `json:"request,omitempty"`
+	Response      *Response           `json:"response,omitempty"`
+	Failure       *RequestFailure     `json:"failure,omitempty"`
+}
+
+func (m ProviderMessage) Validate() error {
+	if err := validateSchema(m.SchemaVersion); err != nil {
+		return err
+	}
+	switch m.Type {
+	case ProviderReady:
+		if strings.TrimSpace(m.AgentID) == "" || m.RuntimeMode != RuntimeModeIsolated {
+			return errors.New("ready message requires agent_id and isolated_runtime")
+		}
+	case ProviderPing, ProviderPong:
+		return nil
+	case ProviderRequest:
+		if m.Request == nil {
+			return errors.New("request message requires request")
+		}
+		if err := m.Request.Validate(); err != nil {
+			return err
+		}
+		if m.Request.Mode == ModeWrite && strings.TrimSpace(m.BaseCommit) == "" {
+			return errors.New("write request message requires base_commit")
+		}
+		if m.Request.Mode == ModeRead && m.BaseCommit != "" {
+			return errors.New("read request message must not include base_commit")
+		}
+		return nil
+	case ProviderResponse:
+		if m.Response == nil {
+			return errors.New("response message requires response")
+		}
+		return m.Response.Validate()
+	case ProviderFailure:
+		if m.Failure == nil {
+			return errors.New("failure message requires failure")
+		}
+		return m.Failure.Validate()
+	case ProviderCancel:
+		if strings.TrimSpace(m.RequestID) == "" {
+			return errors.New("cancel message requires request_id")
+		}
+	default:
+		return fmt.Errorf("unsupported provider message type %q", m.Type)
+	}
+	return nil
+}
+
+// AskResult distinguishes a first delivery containing an answer from a replay
+// that can only return already-persisted metadata. Relay never persists Answer.
+type AskResult struct {
+	SchemaVersion int              `json:"schema_version"`
+	Response      *Response        `json:"response,omitempty"`
+	Metadata      *RequestMetadata `json:"metadata,omitempty"`
+	Replayed      bool             `json:"replayed"`
 }
 
 func (r Response) Validate() error {
@@ -250,6 +380,38 @@ func (r Response) Validate() error {
 	}
 	if len(r.Answer) > MaxResponseBodyBytes {
 		return fmt.Errorf("response body exceeds %d bytes", MaxResponseBodyBytes)
+	}
+	if r.Worktree != nil {
+		if err := r.Worktree.Validate(); err != nil {
+			return err
+		}
+		if r.Worktree.RequestID != r.RequestID {
+			return errors.New("worktree request_id does not match response")
+		}
+	}
+	return nil
+}
+
+// PendingRequest is provider-visible approval metadata. It intentionally has
+// no request body or local repository path.
+type PendingRequest struct {
+	SchemaVersion int             `json:"schema_version"`
+	Metadata      RequestMetadata `json:"metadata"`
+	ExpiresAt     time.Time       `json:"expires_at"`
+}
+
+func (p PendingRequest) Validate(now time.Time) error {
+	if err := validateSchema(p.SchemaVersion); err != nil {
+		return err
+	}
+	if err := p.Metadata.Validate(); err != nil {
+		return err
+	}
+	if p.Metadata.Mode != ModeWrite || p.Metadata.Status != StatusPendingApproval {
+		return errors.New("pending request must be a write awaiting approval")
+	}
+	if p.ExpiresAt.IsZero() || !p.ExpiresAt.After(now) {
+		return errors.New("pending request is expired")
 	}
 	return nil
 }
