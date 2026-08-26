@@ -1,0 +1,129 @@
+name: Create Git tag and GitHub release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (without the v prefix)
+        required: true
+        type: string
+      prerelease:
+        description: Mark the GitHub release as a prerelease
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release v${{ inputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Validate release version
+        id: version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+            echo "Releases must be created from the main branch." >&2
+            exit 1
+          fi
+          package_version="$(node -p "require('./package.json').version")"
+          if [ "${INPUT_VERSION}" != "${package_version}" ]; then
+            echo "Requested version ${INPUT_VERSION} does not match package.json version ${package_version}." >&2
+            exit 1
+          fi
+          if ! printf '%s' "${INPUT_VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$'; then
+            echo "Version must be a valid SemVer value without a v prefix." >&2
+            exit 1
+          fi
+          tag="v${INPUT_VERSION}"
+          if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
+            echo "Tag ${tag} already exists." >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Run release checks
+        run: |
+          test -z "$(gofmt -l .)"
+          go test ./...
+          go test -race ./...
+          go vet ./...
+          npm test
+
+      - name: Build release assets
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p dist staging vendor
+          while read -r goos goarch platform package_arch binary archive; do
+            vendor_dir="vendor/${platform}-${package_arch}"
+            stage_dir="staging/peerctx-v${RELEASE_VERSION}-${goos}-${goarch}"
+            mkdir -p "${vendor_dir}" "${stage_dir}"
+            GOOS="${goos}" GOARCH="${goarch}" CGO_ENABLED=0 \
+              go build -mod=readonly -trimpath -o "${vendor_dir}/${binary}" ./cmd/peerctx
+            cp "${vendor_dir}/${binary}" "${stage_dir}/${binary}"
+            if [ "${archive}" = "zip" ]; then
+              (cd "${stage_dir}" && zip -q "../../dist/peerctx-v${RELEASE_VERSION}-${goos}-${goarch}.zip" "${binary}")
+            else
+              tar -C "${stage_dir}" -czf "dist/peerctx-v${RELEASE_VERSION}-${goos}-${goarch}.tar.gz" "${binary}"
+            fi
+          done <<'TARGETS'
+          darwin arm64 darwin arm64 peerctx tar
+          darwin amd64 darwin x64 peerctx tar
+          linux arm64 linux arm64 peerctx tar
+          linux amd64 linux x64 peerctx tar
+          windows arm64 win32 arm64 peerctx.exe zip
+          windows amd64 win32 x64 peerctx.exe zip
+          TARGETS
+          node scripts/generate-checksums.js
+          node scripts/verify-package.js
+          npm pack --pack-destination dist
+          (cd dist && sha256sum peerctx-* > SHA256SUMS)
+
+      - name: Upload release assets for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: peerctx-v${{ inputs.version }}-release-assets
+          path: dist/
+          if-no-files-found: error
+
+      - name: Create Git tag and GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          prerelease_flag=""
+          if [ "${PRERELEASE}" = "true" ]; then
+            prerelease_flag="--prerelease"
+          fi
+          gh release create "${RELEASE_TAG}" dist/* \
+            --target "${GITHUB_SHA}" \
+            --title "PeerContext ${RELEASE_TAG}" \
+            --generate-notes \
+            ${prerelease_flag}
