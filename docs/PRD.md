@@ -14,7 +14,7 @@
 | CLI | `peerctx` |
 | Skill | `peer-context` |
 | License | MIT |
-| Runtime 决策 | **`isolated_runtime`，已由 3 次冷启动 Spike 通过并锁定** |
+| Runtime 决策 | **`isolated_runtime`，启动时能力门禁 + 发布门禁 Spike** |
 
 ### 变更记录
 
@@ -43,7 +43,7 @@
 
 ### 最终 Runtime 决策
 
-开发前 Spike 已在 `codex-cli 0.149.0-alpha.4.3` 上完成 3 次独立冷启动，认证复用、真实模型调用、个人 Skills/MCP/历史和其他仓库隔离全部通过。因此 MVP **只实现隔离 Runtime**：每个入站请求使用干净 `HOME`、`CODEX_HOME` 和临时目录，只映射宿主认证。
+开发前 Spike 已在 `codex-cli 0.149.0-alpha.4.3` 上完成 3 次独立冷启动；2026-08-26 又用当时当前的 `codex-cli 0.150.0-alpha.8` 按相同门禁复验 3 次。两版的认证复用、真实模型调用、个人 Skills/MCP/历史和其他仓库隔离均全部通过。因此 MVP **只实现隔离 Runtime**：每个入站请求使用干净 `HOME`、`CODEX_HOME` 和临时目录，只映射宿主认证。CLI 不按版本字符串放行，而是在 `doctor` 和 `agent serve` 启动时实际探测必需 exec 接口、认证桥接及 read/write 文件边界；任一能力失败即拒绝服务。完整的 3 次真实模型 Spike 仍作为平台和发布门禁保留。
 
 完整证据见 [Runtime Spike 结果](../spikes/codex-runtime/RESULT.md)。如果未来版本或其他认证后端不满足同一门禁，`doctor` 必须拒绝提供服务，不能静默退回完整宿主环境。
 
@@ -585,7 +585,7 @@ Agent 调用默认 JSON；运维命令可选 `--format text`。
 
 | 风险 | 影响 | 缓解 |
 |---|---|---|
-| Codex CLI 参数或配置变化 | Runtime 无法启动或隔离失效 | `doctor` + 版本兼容表 + CI Spike；失败即拒绝服务 |
+| Codex CLI 参数或配置变化 | Runtime 无法启动或隔离失效 | 启动时能力探测 + CI Spike；失败即拒绝服务 |
 | auth refresh 修改宿主认证 | 认证状态竞争或损坏 | 只映射 auth 文件；原子写入兼容测试；不打印或复制 token |
 | Relay 可见内存正文 | 自托管 Relay 被攻破时泄漏 | TLS、最小日志、短生命周期、无正文落盘；E2E 作为后续 |
 | Prompt 诱导读取其他路径 | 私有资源泄漏 | 默认拒绝整个文件系统，workspace 白名单，网络关闭，canary 测试 |

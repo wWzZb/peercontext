@@ -19,8 +19,6 @@ import (
 	protocolv1 "github.com/wWzZb/peercontext/pkg/protocol/v1"
 )
 
-const VerifiedCodexVersion = "codex-cli 0.149.0-alpha.4.3"
-
 type RuntimeError struct {
 	Code    string
 	Message string
@@ -49,13 +47,6 @@ func NewIsolatedAdapter() (*IsolatedAdapter, error) {
 	if err != nil {
 		return nil, &RuntimeError{Code: "codex_not_found", Message: "Codex CLI is not installed", Err: err}
 	}
-	versionOutput, err := exec.Command(codexPath, "--version").CombinedOutput()
-	if err != nil {
-		return nil, &RuntimeError{Code: "codex_version_unavailable", Message: "Codex version could not be checked", Err: err}
-	}
-	if strings.TrimSpace(string(versionOutput)) != VerifiedCodexVersion {
-		return nil, &RuntimeError{Code: "codex_version_unsupported", Message: "This Codex version has not passed the isolated_runtime gate"}
-	}
 	hostHome, err := os.UserHomeDir()
 	if err != nil {
 		return nil, &RuntimeError{Code: "host_home_unavailable", Message: "The host home directory is unavailable", Err: err}
@@ -68,6 +59,9 @@ func NewIsolatedAdapter() (*IsolatedAdapter, error) {
 	info, err := os.Stat(hostAuth)
 	if err != nil || !info.Mode().IsRegular() {
 		return nil, &RuntimeError{Code: "codex_auth_unavailable", Message: "The verified auth.json bridge is unavailable", Err: err}
+	}
+	if err = probeRuntimeCapabilities(codexPath, hostAuth, runCapabilityCommand); err != nil {
+		return nil, err
 	}
 	return &IsolatedAdapter{codexPath: codexPath, hostAuth: hostAuth}, nil
 }

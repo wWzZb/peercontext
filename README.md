@@ -11,7 +11,7 @@ CLI 不理解请求内容、不读取代码、不规划任务，也不修改提�
 
 当前实现已覆盖 M1–M5：Project/身份/Agent/Relay、read 请求、双边批准的 write、detached worktree、显式 `peer-context` Skill、`doctor`、npm 薄包装和跨平台构建自动化。CLI 在未安装 Skill 时仍可完成全部核心流程。
 
-read/write 正文经 HTTP + WebSocket/WSS 在内存中转，提供端使用固定门禁版本的 `isolated_runtime`。Relay 只保存大小、SHA-256、身份、状态和时间；仓库路径只保存在 Agent 所在机器的本地配置中。write 需要请求端确认和提供端逐次批准，只在明确 commit 的 detached worktree 中执行，不自动 commit、merge 或 push。
+read/write 正文经 HTTP + WebSocket/WSS 在内存中转，提供端使用 `isolated_runtime`。CLI 不硬编码 Codex 版本号；`doctor` 和 `agent serve` 会在启动时实际探测必需命令接口、认证桥接及 read/write 文件边界，能力不满足时拒绝上线。Relay 只保存大小、SHA-256、身份、状态和时间；仓库路径只保存在 Agent 所在机器的本地配置中。write 需要请求端确认和提供端逐次批准，只在明确 commit 的 detached worktree 中执行，不自动 commit、merge 或 push。
 
 ## 交给 Codex 安装
 

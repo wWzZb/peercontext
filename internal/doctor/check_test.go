@@ -11,7 +11,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wWzZb/peercontext/internal/codex"
 	"github.com/wWzZb/peercontext/internal/localstate"
 	"github.com/wWzZb/peercontext/internal/relay"
 )
@@ -51,20 +50,7 @@ func TestDoctorChecksRuntimeRelayCredentialRepositoryWithoutLeakingSecretsOrPath
 		t.Fatal(err)
 	}
 
-	fakeBin := t.TempDir()
-	fakeCodex := filepath.Join(fakeBin, "codex")
-	script := "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo '" + codex.VerifiedCodexVersion + "'; exit 0; fi\nexit 1\n"
-	if err = os.WriteFile(fakeCodex, []byte(script), 0700); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", fakeBin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	codexHome := t.TempDir()
-	if err = os.WriteFile(filepath.Join(codexHome, "auth.json"), []byte("{}\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("CODEX_HOME", codexHome)
-
-	report := Run(t.Context(), manager)
+	report := run(t.Context(), manager, func() error { return nil })
 	if runtime.GOOS == "darwin" && runtime.GOARCH == "arm64" && !report.Healthy {
 		t.Fatalf("doctor report = %#v", report)
 	}
@@ -75,7 +61,7 @@ func TestDoctorChecksRuntimeRelayCredentialRepositoryWithoutLeakingSecretsOrPath
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, secret := range []string{tokenCanary, credentialPath, repository, codexHome} {
+	for _, secret := range []string{tokenCanary, credentialPath, repository} {
 		if strings.Contains(string(encoded), secret) {
 			t.Fatalf("doctor report leaked secret/path %q: %s", secret, encoded)
 		}

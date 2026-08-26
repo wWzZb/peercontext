@@ -62,7 +62,7 @@ func main() {
 		Platform:      runtime.GOOS + "/" + runtime.GOARCH,
 		AuthBridge:    "host_auth_json_symlink",
 		RunsRequired:  coldRuns,
-		Decision:      "full_host_runtime",
+		Decision:      "unsupported_runtime",
 	}
 
 	codexPath, err := exec.LookPath("codex")
@@ -113,7 +113,7 @@ func main() {
 		r.Decision = "isolated_runtime"
 		finish(&r, "3 次冷启动全部通过：MVP 可以使用干净 HOME/CODEX_HOME，仅复用宿主认证")
 	} else {
-		finish(&r, "至少一项门禁失败：MVP 必须使用提供端完整现有 Codex 运行环境")
+		finish(&r, "至少一项门禁失败：此 Codex 版本不得用于提供端 isolated_runtime")
 	}
 	emit(r, *reportPath)
 	if !allPassed {

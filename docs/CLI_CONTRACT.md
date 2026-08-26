@@ -10,7 +10,7 @@
   "data": {},
   "meta": {
     "request_id": "req_...",
-    "version": "0.1.0"
+    "version": "0.1.1"
   }
 }
 ```
@@ -162,6 +162,6 @@ peerctx doctor
 
 `skills list/read` 暴露编入二进制、与 `peerctx` 同版本的 `.agents/skills/peer-context` 文本，不负责安装。Skill 的 `allow_implicit_invocation` 为 `false`，只服务请求端并且只调用本页公开命令。
 
-`doctor` 以无 token、无本地路径的结构化 checks 验证已门禁平台、固定 Codex 版本、`auth.json` 桥接、Permission Profile、credential 存储、Relay TLS/health、Git 仓库和保留 worktree。任一阻塞检查失败时返回非零和 `error.details`；`agent serve` 同样拒绝未门禁平台，不存在完整宿主环境回退。
+`doctor` 以无 token、无本地路径的结构化 checks 验证已门禁平台、Codex 必需命令接口、`auth.json` 桥接、read/write Permission Profile 的真实文件边界、credential 存储、Relay TLS/health、Git 仓库和保留 worktree。任一阻塞检查失败时返回非零和 `error.details`；`agent serve` 使用同一能力门禁并拒绝不兼容环境，不存在完整宿主环境回退。Codex 版本字符串不参与放行判断。
 
 `peerctx` npm 包只是同版本 Go 二进制的平台包装。内置二进制必须通过 SHA-256 manifest 校验；Node 层不解析命令、stdin、正文或回答。

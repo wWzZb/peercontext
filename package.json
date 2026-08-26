@@ -1,6 +1,6 @@
 {
   "name": "peerctx",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Thin platform wrapper for the PeerContext CLI",
   "license": "MIT",
   "homepage": "https://github.com/wWzZb/peercontext#readme",
