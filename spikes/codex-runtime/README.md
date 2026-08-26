@@ -25,6 +25,8 @@ Codex 可能在本轮隔离目录中新建 `state_*.sqlite` 运行状态库；�
 结果只有两种：
 
 - `isolated_runtime`：3 次全部通过，可以采用隔离运行时；
-- `full_host_runtime`：任意一项失败，MVP 直接使用提供端完整现有 Codex 环境，不做部分隔离。
+- `unsupported_runtime`：任意一项失败，该 Codex 版本不得用于提供端，不能回退到完整宿主环境。
 
 结果文件不写入认证内容或其他密钥。
+
+正式 Runtime 不硬编码本报告中的 Codex 版本号。`doctor` 和 `agent serve` 会在启动时执行无模型的能力探测；本 Spike 仍用于平台门禁、发布复验和真实模型端到端证据。

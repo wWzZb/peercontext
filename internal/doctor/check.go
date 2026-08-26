@@ -42,7 +42,16 @@ type Report struct {
 	Checks        []Check                `json:"checks"`
 }
 
+func isolatedRuntimeReadiness() error {
+	_, err := codex.NewIsolatedAdapter()
+	return err
+}
+
 func Run(ctx context.Context, manager *localstate.Manager) Report {
+	return run(ctx, manager, isolatedRuntimeReadiness)
+}
+
+func run(ctx context.Context, manager *localstate.Manager, runtimeReadiness func() error) Report {
 	report := Report{SchemaVersion: 1, RuntimeMode: protocolv1.RuntimeModeIsolated, Healthy: true}
 	add := func(check Check) {
 		report.Checks = append(report.Checks, check)
@@ -52,15 +61,15 @@ func Run(ctx context.Context, manager *localstate.Manager) Report {
 	}
 	if codex.SupportedPlatform() {
 		add(Check{Code: "runtime_platform_verified", Status: Pass, Message: "This platform passed the isolated_runtime gate."})
-		if _, err := codex.NewIsolatedAdapter(); err != nil {
+		if err := runtimeReadiness(); err != nil {
 			code := "isolated_runtime_unavailable"
 			var runtimeErr *codex.RuntimeError
 			if errors.As(err, &runtimeErr) {
 				code = runtimeErr.Code
 			}
-			add(Check{Code: code, Status: Fail, Message: "Codex version or authentication bridge is not ready.", Hint: "Install the verified Codex version and verify the auth.json bridge.", Retryable: code != "codex_version_unsupported"})
+			add(Check{Code: code, Status: Fail, Message: "Codex did not pass the isolated_runtime capability checks.", Hint: "Verify the Codex executable, auth.json bridge, strict config support, and read/write sandbox boundaries.", Retryable: false})
 		} else {
-			add(Check{Code: "codex_runtime_ready", Status: Pass, Message: "Codex version and authentication bridge are ready."})
+			add(Check{Code: "codex_runtime_ready", Status: Pass, Message: "Codex passed the isolated_runtime capability checks and authentication bridge."})
 		}
 	} else {
 		add(Check{Code: "runtime_platform_ungated", Status: Fail, Message: "This platform has not passed the isolated_runtime gate.", Hint: "Do not run agent serve until this exact platform passes the Runtime gate."})

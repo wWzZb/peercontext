@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
-  "started_at": "2026-08-25T09:55:46Z",
-  "finished_at": "2026-08-25T09:56:32Z",
+  "started_at": "2026-08-26T07:21:18Z",
+  "finished_at": "2026-08-26T07:22:06Z",
   "platform": "darwin/arm64",
-  "codex_version": "codex-cli 0.149.0-alpha.4.3",
+  "codex_version": "codex-cli 0.150.0-alpha.8",
   "auth_bridge": "host_auth_json_symlink",
   "runs_required": 3,
   "runs": [
     {
       "run": 1,
-      "duration": "18.59s",
+      "duration": "21.74s",
       "checks": [
         {
           "name": "auth_mount",
@@ -34,7 +34,7 @@
         {
           "name": "codex_exec",
           "passed": true,
-          "detail": "codex exec 成功；工作区探针=\"allowed-77d349366f9119f7\"，外部探针=\"BLOCKED\""
+          "detail": "codex exec 成功；工作区探针=\"allowed-3208a624a1198e0f\\n\"，外部探针=\"BLOCKED\""
         },
         {
           "name": "other_repository_isolation",
@@ -55,7 +55,7 @@
     },
     {
       "run": 2,
-      "duration": "13.297s",
+      "duration": "13.576s",
       "checks": [
         {
           "name": "auth_mount",
@@ -80,7 +80,7 @@
         {
           "name": "codex_exec",
           "passed": true,
-          "detail": "codex exec 成功；工作区探针=\"allowed-62655e952a046157\"，外部探针=\"BLOCKED\""
+          "detail": "codex exec 成功；工作区探针=\"allowed-e13b23938e997e6f\"，外部探针=\"BLOCKED\""
         },
         {
           "name": "other_repository_isolation",
@@ -101,7 +101,7 @@
     },
     {
       "run": 3,
-      "duration": "13.516s",
+      "duration": "13.404s",
       "checks": [
         {
           "name": "auth_mount",
@@ -126,7 +126,7 @@
         {
           "name": "codex_exec",
           "passed": true,
-          "detail": "codex exec 成功；工作区探针=\"allowed-39db9a3373eb91ca\"，外部探针=\"BLOCKED\""
+          "detail": "codex exec 成功；工作区探针=\"allowed-4e235e9db0967901\"，外部探针=\"BLOCKED\""
         },
         {
           "name": "other_repository_isolation",

@@ -973,7 +973,7 @@ func writeMappedError(stderr io.Writer, err error) clioutput.ExitCode {
 		case "agent_repository_unavailable":
 			exit = clioutput.ExitUnavailable
 			errorType = "availability"
-		case "codex_execution_failed", "isolated_runtime_unavailable", "provider_runtime_unavailable", "codex_auth_unavailable", "codex_version_unsupported", "git_unavailable", "base_commit_invalid", "worktree_create_failed", "worktree_verification_failed", "worktree_not_detached", "git_metadata_boundary_invalid", "git_metadata_boundary_required":
+		case "codex_execution_failed", "isolated_runtime_unavailable", "provider_runtime_unavailable", "codex_auth_unavailable", "codex_version_unavailable", "codex_interface_unsupported", "codex_read_isolation_probe_failed", "codex_write_isolation_probe_failed", "git_unavailable", "base_commit_invalid", "worktree_create_failed", "worktree_verification_failed", "worktree_not_detached", "git_metadata_boundary_invalid", "git_metadata_boundary_required":
 			exit = clioutput.ExitRuntime
 			errorType = "runtime"
 		}

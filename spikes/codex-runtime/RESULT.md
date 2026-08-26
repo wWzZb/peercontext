@@ -4,7 +4,7 @@
 
 **PASS — PeerContext MVP 采用隔离 Runtime。**
 
-在 `codex-cli 0.149.0-alpha.4.3`、macOS arm64 上，连续 3 次冷启动均成功：
+2026-08-26 使用当前 `codex-cli 0.150.0-alpha.8`、macOS arm64 重新执行门禁，连续 3 次冷启动均成功：
 
 - 使用全新的 `HOME` 和 `CODEX_HOME`；
 - 只通过符号链接复用宿主 `auth.json`；
@@ -15,15 +15,15 @@
 - 宿主历史未挂载，也未生成可复用的会话历史；
 - 授权工作区可读，工作区外随机探针不可读。
 
-因此正式实现锁定为：每个入站请求使用干净运行目录，只复用提供端已有认证，不加载其个人配置、Skills、MCP、插件、hooks 或历史。
+因此正式实现仍锁定为：每个入站请求使用干净运行目录，只复用提供端已有认证，不加载其个人配置、Skills、MCP、插件、hooks 或历史。运行时不维护版本白名单，而是在 `doctor` 和 `agent serve` 启动时实际探测命令接口、认证桥接和 read/write 文件边界；本报告继续作为当前平台和版本的完整真实模型证据。
 
 ## 运行信息
 
 | 项目 | 结果 |
 |---|---|
-| 日期 | 2026-08-25 |
+| 日期 | 2026-08-26 |
 | 平台 | darwin/arm64 |
-| Codex | `codex-cli 0.149.0-alpha.4.3` |
+| Codex | `codex-cli 0.150.0-alpha.8` |
 | 认证桥接 | `host_auth_json_symlink` |
 | 冷启动次数 | 3 |
 | 总结论 | `isolated_runtime` |
@@ -41,7 +41,7 @@
 | 个人历史隔离 | PASS | PASS | PASS |
 | 干净 `HOME` | PASS | PASS | PASS |
 
-每轮完整脱敏结果见 [result.json](./result.json)。
+每轮完整脱敏结果见 [result.json](./result.json)。该 JSON 保存最近一次门禁结果；`0.149.0-alpha.4.3` 的历史结论仍保留在 Git 历史中。
 
 ## 关于 `state_5.sqlite`
 
@@ -52,6 +52,7 @@ Codex 会在每轮全新的隔离 `CODEX_HOME` 中创建自己的 `state_5.sqlit
 ## 适用范围与残余风险
 
 - 当前实测的是本机已有 `auth.json` 的认证桥接；其他认证后端未被本次结果覆盖。
+- 当前报告验证的是 `codex-cli 0.150.0-alpha.8`；以后版本由启动时能力门禁决定是否可用，不按版本范围猜测兼容。
 - 宿主认证可能被 Codex 正常刷新，这是唯一允许触达的宿主状态。
 - Permission Profile 和 Codex CLI 都可能随版本变化。正式 CLI 的 `doctor` 必须验证版本、认证桥接和权限配置；不满足时拒绝启动，不静默切换运行模式。
 - macOS arm64 已实测；Linux 和 Windows 需要在 CI/发布前补平台测试。

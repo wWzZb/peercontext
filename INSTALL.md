@@ -12,7 +12,7 @@
 
 ```shell
 # 安装 CLI
-npm install -g peerctx@0.1.0
+npm install -g peerctx@0.1.1
 
 # 安装 peer-context Skill
 npx -y skills add https://wwzzb.github.io/peercontext --skill peer-context --agent codex -g -y

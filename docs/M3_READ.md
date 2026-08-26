@@ -13,7 +13,7 @@ Provider WebSocket 使用统一 `ProviderMessage`，类型为 `ready/ping/pong/r
 
 ## isolated_runtime
 
-当前门禁固定为 `codex-cli 0.149.0-alpha.4.3`，与 Runtime Spike 一致。版本、可执行文件或 `auth.json` 桥接不满足时，`agent serve` 拒绝上线。
+Runtime 不使用 Codex 版本白名单。`doctor` 和 `agent serve` 每次启动都会在一次性目录中探测必需 exec 参数、干净配置、`auth.json` 桥接，以及 read/write Permission Profile 的真实文件边界。能力不满足、可执行文件不可用或认证桥接失败时，`agent serve` 拒绝上线；不会按宽泛版本范围猜测兼容，也不会回退完整宿主环境。
 
 每次请求创建一次性 `home/`、`codex-home/`、`tmp/` 和 `runtime/`：
 
