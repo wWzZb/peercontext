@@ -108,7 +108,7 @@ func TestReadTimeoutAndExplicitCancelStopProviderContext(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
-	server, _ := relay.NewServer(store, slog.Default(), relay.WithReadTimeout(80*time.Millisecond))
+	server, _ := relay.NewServer(store, slog.Default(), relay.WithReadTimeout(5*time.Second))
 	httpServer := httptest.NewServer(server.Handler())
 	t.Cleanup(httpServer.Close)
 	providerClient, requesterClient, agent, requester := setupReadProject(t, store, httpServer.URL)
@@ -128,13 +128,21 @@ func TestReadTimeoutAndExplicitCancelStopProviderContext(t *testing.T) {
 	<-ready
 	t.Cleanup(func() { stop(); <-done })
 
-	makeRequest := func(id string) protocolv1.Request {
+	makeRequest := func(id string, lifetime time.Duration) protocolv1.Request {
 		now := time.Now().UTC()
-		expires := now.Add(time.Minute)
+		expires := now.Add(lifetime)
 		body := []byte(id)
 		return protocolv1.Request{SchemaVersion: 1, ID: id, ProjectID: requester.ProjectID, RequesterID: requester.ID, AgentID: agent.ID, Mode: protocolv1.ModeRead, Body: body, BodySHA256: protocolv1.BodySHA256(body), CreatedAt: now, ExpiresAt: &expires}
 	}
-	_, err = requesterClient.Ask(t.Context(), makeRequest("req_timeout"))
+	timeoutDone := make(chan error, 1)
+	go func() {
+		_, err := requesterClient.Ask(t.Context(), makeRequest("req_timeout", 2*time.Second))
+		timeoutDone <- err
+	}()
+	if id := <-started; id != "req_timeout" {
+		t.Fatalf("started id = %s", id)
+	}
+	err = <-timeoutDone
 	var timeoutErr *Error
 	if !errors.As(err, &timeoutErr) || timeoutErr.Code != "request_timeout" {
 		t.Fatalf("timeout error = %v", err)
@@ -148,15 +156,12 @@ func TestReadTimeoutAndExplicitCancelStopProviderContext(t *testing.T) {
 	}
 
 	askDone := make(chan error, 1)
-	go func() { _, err := requesterClient.Ask(t.Context(), makeRequest("req_cancel")); askDone <- err }()
-	if id := <-started; id != "req_timeout" { // timeout start may still be queued before its cancellation signal
-		if id != "req_cancel" {
-			t.Fatalf("started id = %s", id)
-		}
-	} else {
-		if id := <-started; id != "req_cancel" {
-			t.Fatalf("started id = %s", id)
-		}
+	go func() {
+		_, err := requesterClient.Ask(t.Context(), makeRequest("req_cancel", time.Minute))
+		askDone <- err
+	}()
+	if id := <-started; id != "req_cancel" {
+		t.Fatalf("started id = %s", id)
 	}
 	if _, err := requesterClient.CancelRequest(t.Context(), "req_cancel"); err != nil {
 		t.Fatalf("CancelRequest: %v", err)
@@ -174,7 +179,10 @@ func TestReadTimeoutAndExplicitCancelStopProviderContext(t *testing.T) {
 	}
 
 	askDone = make(chan error, 1)
-	go func() { _, err := requesterClient.Ask(t.Context(), makeRequest("req_acl_revoke")); askDone <- err }()
+	go func() {
+		_, err := requesterClient.Ask(t.Context(), makeRequest("req_acl_revoke", time.Minute))
+		askDone <- err
+	}()
 	if id := <-started; id != "req_acl_revoke" {
 		t.Fatalf("started id = %s", id)
 	}
