@@ -13,6 +13,16 @@ CLI 不理解请求内容、不读取代码、不规划任务，也不修改提�
 
 read/write 正文经 HTTP + WebSocket/WSS 在内存中转，提供端使用固定门禁版本的 `isolated_runtime`。Relay 只保存大小、SHA-256、身份、状态和时间；仓库路径只保存在 Agent 所在机器的本地配置中。write 需要请求端确认和提供端逐次批准，只在明确 commit 的 detached worktree 中执行，不自动 commit、merge 或 push。
 
+## 交给 Codex 安装
+
+仓库提供了一份面向 AI Agent 的自包含安装手册：[PeerContext CLI 安装指南](./INSTALL.md)。可以把该 Markdown 文件直接交给同事的 Codex，并发送：
+
+```text
+请完整阅读附件中的 PeerContext CLI 安装指南，然后按顺序执行。需要全局安装时先让我确认；只安装 CLI 和 Skill，不要创建或加入 Project，不要启动 Relay 或 Agent。完成后只报告版本、Skill 状态和仍需人工处理的步骤。
+```
+
+CLI 通过 npm 安装，显式触发的 `peer-context` Skill 通过 `npx skills add` 从独立 HTTPS 地址安装。安装不会创建或加入 Project；实际用法由安装后的 Skill 自己说明。
+
 - [最终 PRD](./docs/PRD.md)
 - [Runtime Spike 结果](./spikes/codex-runtime/RESULT.md)
 - [CLI JSON 与退出码契约](./docs/CLI_CONTRACT.md)

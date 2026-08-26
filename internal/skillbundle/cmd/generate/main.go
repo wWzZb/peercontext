@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"go/format"
 	"os"
 	"path/filepath"
 	"sort"
@@ -27,7 +28,11 @@ func main() {
 		output += fmt.Sprintf("\t%s: %s,\n", strconv.Quote(path), strconv.Quote(string(content)))
 	}
 	output += "}\n"
-	if err := os.WriteFile("bundle_gen.go", []byte(output), 0600); err != nil {
+	formatted, err := format.Source([]byte(output))
+	if err != nil {
+		panic(err)
+	}
+	if err := os.WriteFile("bundle_gen.go", formatted, 0644); err != nil {
 		panic(err)
 	}
 }
