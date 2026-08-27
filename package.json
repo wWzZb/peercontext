@@ -1,7 +1,7 @@
 {
   "name": "peerctx",
-  "version": "0.1.1",
-  "description": "Thin platform wrapper for the PeerContext CLI",
+  "version": "0.2.0",
+  "description": "LAN-first private repository collaboration for Apple Silicon Mac",
   "license": "MIT",
   "homepage": "https://github.com/wWzZb/peercontext#readme",
   "repository": {

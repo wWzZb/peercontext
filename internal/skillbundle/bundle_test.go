@@ -43,12 +43,12 @@ func TestSkillIsExplicitRequesterOnlyAndUsesPublicCLI(t *testing.T) {
 		t.Fatal("Skill allows implicit invocation")
 	}
 	skill, _ := Read("SKILL.md")
-	for _, required := range []string{"Exit code `10`", "Never reuse `confirmation_token`", "Do not call `request approve`", "public `peerctx` commands"} {
+	for _, required := range []string{"only discovers Agents and sends read requests", "There is no write mode", "public `peerctx` CLI"} {
 		if !bytes.Contains(skill, []byte(required)) {
 			t.Fatalf("Skill missing safety rule %q", required)
 		}
 	}
-	for _, forbidden := range []string{"internal/relay", "internal/cli", "github.com/wWzZb/peercontext/internal"} {
+	for _, forbidden := range []string{"internal/relay", "internal/cli", "github.com/wWzZb/peercontext/internal", "peerctx task", "--mode write"} {
 		if bytes.Contains(skill, []byte(forbidden)) {
 			t.Fatalf("Skill depends on private implementation %q", forbidden)
 		}

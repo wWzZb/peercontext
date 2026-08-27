@@ -5,14 +5,11 @@ import (
 	"errors"
 	"io"
 	"sync"
-
-	protocolv1 "github.com/wWzZb/peercontext/pkg/protocol/v1"
 )
 
 // RecordedInvocation is a byte-for-byte record of one fake adapter call.
 type RecordedInvocation struct {
 	Workspace string
-	Mode      protocolv1.RequestMode
 	Stdin     []byte
 }
 
@@ -44,7 +41,6 @@ func (f *FakeAdapter) Run(ctx context.Context, invocation Invocation) (Result, e
 	f.mu.Lock()
 	f.invocations = append(f.invocations, RecordedInvocation{
 		Workspace: invocation.Workspace,
-		Mode:      invocation.Mode,
 		Stdin:     append([]byte(nil), stdin...),
 	})
 	response := append([]byte(nil), f.Response...)
@@ -71,7 +67,6 @@ func (f *FakeAdapter) Invocations() []RecordedInvocation {
 	for i, invocation := range f.invocations {
 		result[i] = RecordedInvocation{
 			Workspace: invocation.Workspace,
-			Mode:      invocation.Mode,
 			Stdin:     append([]byte(nil), invocation.Stdin...),
 		}
 	}

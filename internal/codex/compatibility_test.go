@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-func TestRuntimeCapabilityProbeChecksInterfaceAuthAndReadWriteBoundaries(t *testing.T) {
+func TestRuntimeCapabilityProbeChecksInterfaceAuthAndReadBoundary(t *testing.T) {
 	hostAuth := filepath.Join(t.TempDir(), "auth.json")
 	if err := os.WriteFile(hostAuth, []byte("{}\n"), 0600); err != nil {
 		t.Fatal(err)
@@ -28,20 +28,6 @@ func TestRuntimeCapabilityProbeChecksInterfaceAuthAndReadWriteBoundaries(t *test
 		case strings.Contains(joined, "peerctx-read"):
 			allowed, err := os.ReadFile(filepath.Join(directory, "allowed.txt"))
 			return allowed, nil, err
-		case strings.Contains(joined, "peerctx-write"):
-			if err := os.WriteFile(filepath.Join(directory, "write-profile-write-probe"), []byte("ok"), 0600); err != nil {
-				return nil, nil, err
-			}
-			gitCommon := args[len(args)-3]
-			allowed, err := os.ReadFile(filepath.Join(directory, "allowed.txt"))
-			if err != nil {
-				return nil, nil, err
-			}
-			metadata, err := os.ReadFile(filepath.Join(gitCommon, "metadata.txt"))
-			if err != nil {
-				return nil, nil, err
-			}
-			return []byte(strings.TrimSpace(string(allowed)) + "|" + strings.TrimSpace(string(metadata))), nil, nil
 		default:
 			return nil, nil, errors.New("unexpected capability command")
 		}
@@ -49,8 +35,8 @@ func TestRuntimeCapabilityProbeChecksInterfaceAuthAndReadWriteBoundaries(t *test
 	if err := probeRuntimeCapabilities("/fake/codex", hostAuth, runner); err != nil {
 		t.Fatal(err)
 	}
-	if len(calls) != 5 {
-		t.Fatalf("capability commands = %d, want 5: %v", len(calls), calls)
+	if len(calls) != 4 {
+		t.Fatalf("capability commands = %d, want 4: %v", len(calls), calls)
 	}
 }
 

@@ -46,26 +46,6 @@ jobs:
             goarch: arm64
             platform: darwin
             binary: peerctx
-          - goos: darwin
-            goarch: amd64
-            platform: darwin
-            binary: peerctx
-          - goos: linux
-            goarch: arm64
-            platform: linux
-            binary: peerctx
-          - goos: linux
-            goarch: amd64
-            platform: linux
-            binary: peerctx
-          - goos: windows
-            goarch: arm64
-            platform: win32
-            binary: peerctx.exe
-          - goos: windows
-            goarch: amd64
-            platform: win32
-            binary: peerctx.exe
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5

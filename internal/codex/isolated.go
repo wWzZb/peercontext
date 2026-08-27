@@ -16,7 +16,7 @@ import (
 	"strconv"
 	"strings"
 
-	protocolv1 "github.com/wWzZb/peercontext/pkg/protocol/v1"
+	protocolv2 "github.com/wWzZb/peercontext/pkg/protocol/v2"
 )
 
 type RuntimeError struct {
@@ -73,17 +73,14 @@ func SupportedPlatform() bool { return runtime.GOOS == "darwin" && runtime.GOARC
 // reading any repository.
 func ValidateIsolationPolicy() error {
 	read := isolatedReadConfigFor("/peerctx/clean-home", "/peerctx/clean-tmp")
-	write := isolatedWriteConfigFor("/peerctx/clean-home", "/peerctx/clean-tmp", "/peerctx/git-common")
-	for name, config := range map[string]string{"read": read, "write": write} {
-		for _, required := range []string{"\":root\" = \"deny\"", "enabled = false", "inherit = \"none\"", "PEERCTX_INBOUND_REQUEST"} {
-			if !strings.Contains(config, required) {
-				return fmt.Errorf("%s isolation policy is missing %q", name, required)
-			}
+	for _, required := range []string{"\":root\" = \"deny\"", "enabled = false", "inherit = \"none\"", "PEERCTX_INBOUND_REQUEST"} {
+		if !strings.Contains(read, required) {
+			return fmt.Errorf("read isolation policy is missing %q", required)
 		}
-		for _, forbidden := range []string{"danger-full-access", "unrestricted", "enabled = true", "inherit = \"all\"", "inherit = \"core\""} {
-			if strings.Contains(config, forbidden) {
-				return fmt.Errorf("%s isolation policy contains forbidden value %q", name, forbidden)
-			}
+	}
+	for _, forbidden := range []string{"danger-full-access", "unrestricted", "enabled = true", "inherit = \"all\"", "inherit = \"core\"", "peerctx-write"} {
+		if strings.Contains(read, forbidden) {
+			return fmt.Errorf("read isolation policy contains forbidden value %q", forbidden)
 		}
 	}
 	for _, required := range []string{"\".\" = \"read\"", "default_permissions = \"peerctx-read\""} {
@@ -91,18 +88,10 @@ func ValidateIsolationPolicy() error {
 			return fmt.Errorf("read isolation policy is missing %q", required)
 		}
 	}
-	for _, required := range []string{"\".\" = \"write\"", "\".git\" = \"read\"", "\"/peerctx/git-common\" = \"read\"", "default_permissions = \"peerctx-write\""} {
-		if !strings.Contains(write, required) {
-			return fmt.Errorf("write isolation policy is missing %q", required)
-		}
-	}
 	return nil
 }
 
 func (a *IsolatedAdapter) Run(ctx context.Context, invocation Invocation) (Result, error) {
-	if err := invocation.Mode.Validate(); err != nil {
-		return Result{}, &RuntimeError{Code: "request_mode_invalid", Message: "The isolated adapter requires an explicit read or write mode", Err: err}
-	}
 	if invocation.Stdin == nil {
 		return Result{}, &RuntimeError{Code: "codex_stdin_required", Message: "Codex stdin is required"}
 	}
@@ -113,13 +102,6 @@ func (a *IsolatedAdapter) Run(ctx context.Context, invocation Invocation) (Resul
 	info, err := os.Stat(workspace)
 	if err != nil || !info.IsDir() {
 		return Result{}, &RuntimeError{Code: "agent_repository_unavailable", Message: "The Agent repository is unavailable", Err: err}
-	}
-	gitCommonDir := ""
-	if invocation.Mode == protocolv1.ModeWrite {
-		gitCommonDir, err = validateDetachedWorktree(workspace, invocation.GitCommonDir)
-		if err != nil {
-			return Result{}, err
-		}
 	}
 	root, err := os.MkdirTemp(a.tempParent, "peerctx-request-")
 	if err != nil {
@@ -139,9 +121,6 @@ func (a *IsolatedAdapter) Run(ctx context.Context, invocation Invocation) (Resul
 		return Result{}, &RuntimeError{Code: "isolated_runtime_unavailable", Message: "The verified auth.json bridge could not be mounted", Err: err}
 	}
 	config := isolatedReadConfigFor(home, tmp)
-	if invocation.Mode == protocolv1.ModeWrite {
-		config = isolatedWriteConfigFor(home, tmp, gitCommonDir)
-	}
 	if err = os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(config), 0600); err != nil {
 		return Result{}, &RuntimeError{Code: "isolated_runtime_unavailable", Message: "The isolated Codex config could not be written", Err: err}
 	}
@@ -165,7 +144,7 @@ func (a *IsolatedAdapter) Run(ctx context.Context, invocation Invocation) (Resul
 	}
 	stderrDone := make(chan struct{})
 	go func() { _, _ = io.Copy(io.Discard, stderr); close(stderrDone) }()
-	final, parseErr := parseFinalAgentMessage(stdout, protocolv1.MaxResponseBodyBytes)
+	final, parseErr := parseFinalAgentMessage(stdout, protocolv2.MaxResponseBodyBytes)
 	if parseErr != nil {
 		cancel()
 	}
@@ -181,41 +160,6 @@ func (a *IsolatedAdapter) Run(ctx context.Context, invocation Invocation) (Resul
 		return Result{}, &RuntimeError{Code: "codex_execution_failed", Message: "Codex exited without a successful final answer", Err: waitErr}
 	}
 	return Result{FinalMessage: final}, nil
-}
-
-func validateDetachedWorktree(workspace, expectedCommonDir string) (string, error) {
-	if strings.TrimSpace(expectedCommonDir) == "" {
-		return "", &RuntimeError{Code: "git_metadata_boundary_required", Message: "The write runtime requires the provider Git metadata boundary"}
-	}
-	gitPath, err := exec.LookPath("git")
-	if err != nil {
-		return "", &RuntimeError{Code: "git_unavailable", Message: "Git is unavailable", Err: err}
-	}
-	gitFile, err := os.Stat(filepath.Join(workspace, ".git"))
-	if err != nil || !gitFile.Mode().IsRegular() {
-		return "", &RuntimeError{Code: "worktree_not_detached", Message: "The write workspace is not a linked detached worktree", Err: err}
-	}
-	head, err := exec.Command(gitPath, "-C", workspace, "rev-parse", "--abbrev-ref", "HEAD").CombinedOutput()
-	if err != nil || strings.TrimSpace(string(head)) != "HEAD" {
-		return "", &RuntimeError{Code: "worktree_not_detached", Message: "The write workspace is not detached", Err: err}
-	}
-	commonOutput, err := exec.Command(gitPath, "-C", workspace, "rev-parse", "--git-common-dir").CombinedOutput()
-	if err != nil {
-		return "", &RuntimeError{Code: "git_metadata_boundary_invalid", Message: "The Git metadata boundary could not be resolved", Err: err}
-	}
-	actual := strings.TrimSpace(string(commonOutput))
-	if !filepath.IsAbs(actual) {
-		actual = filepath.Join(workspace, actual)
-	}
-	actual, err = filepath.Abs(actual)
-	if err != nil {
-		return "", &RuntimeError{Code: "git_metadata_boundary_invalid", Message: "The Git metadata boundary could not be normalized", Err: err}
-	}
-	expected, err := filepath.Abs(expectedCommonDir)
-	if err != nil || filepath.Clean(actual) != filepath.Clean(expected) {
-		return "", &RuntimeError{Code: "git_metadata_boundary_invalid", Message: "The Git metadata boundary does not match the approved worktree", Err: err}
-	}
-	return actual, nil
 }
 
 const isolatedReadConfig = `check_for_update_on_startup = false
@@ -245,14 +189,10 @@ enabled = false
 `
 
 func isolatedReadConfigFor(home, tmp string) string {
-	return isolatedConfigFor(home, tmp, protocolv1.ModeRead, "")
+	return isolatedConfigFor(home, tmp)
 }
 
-func isolatedWriteConfigFor(home, tmp, gitCommonDir string) string {
-	return isolatedConfigFor(home, tmp, protocolv1.ModeWrite, gitCommonDir)
-}
-
-func isolatedConfigFor(home, tmp string, mode protocolv1.RequestMode, gitCommonDir string) string {
+func isolatedConfigFor(home, tmp string) string {
 	pathValue := os.Getenv("PATH")
 	if pathValue == "" {
 		pathValue = "/usr/bin:/bin"
@@ -272,41 +212,7 @@ func isolatedConfigFor(home, tmp string, mode protocolv1.RequestMode, gitCommonD
 	for _, key := range keys {
 		entries = append(entries, strconv.Quote(key)+" = "+strconv.Quote(values[key]))
 	}
-	base := isolatedReadConfig
-	if mode == protocolv1.ModeWrite {
-		base = isolatedWriteConfigForGitDir(gitCommonDir)
-	}
-	return base + "\n[shell_environment_policy]\ninherit = \"none\"\nset = { " + strings.Join(entries, ", ") + " }\n"
-}
-
-func isolatedWriteConfigForGitDir(gitCommonDir string) string {
-	return `check_for_update_on_startup = false
-default_permissions = "peerctx-write"
-
-[analytics]
-enabled = false
-
-[features]
-apps = false
-browser_use = false
-computer_use = false
-hooks = false
-multi_agent = false
-plugins = false
-
-[permissions.peerctx-write.filesystem]
-":root" = "deny"
-":minimal" = "read"
-":tmpdir" = "write"
-` + strconv.Quote(gitCommonDir) + ` = "read"
-
-[permissions.peerctx-write.filesystem.":workspace_roots"]
-"." = "write"
-".git" = "read"
-
-[permissions.peerctx-write.network]
-enabled = false
-`
+	return isolatedReadConfig + "\n[shell_environment_policy]\ninherit = \"none\"\nset = { " + strings.Join(entries, ", ") + " }\n"
 }
 
 func isolatedEnvironment(home, codexHome, tmp string) []string {

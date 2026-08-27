@@ -1,6 +1,6 @@
 interface:
   display_name: "PeerContext"
-  short_description: "Ask another private repository's local Codex"
+  short_description: "Ask a teammate's LAN repository Agent"
   default_prompt: "Use $peer-context to obtain the missing cross-repository fact with the smallest necessary request."
 
 policy:

@@ -9,12 +9,9 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	protocolv1 "github.com/wWzZb/peercontext/pkg/protocol/v1"
 )
 
-// TestRealIsolatedRuntimeSmoke is the single opt-in real model invocation
-// allowed after the fake-adapter suite. Normal and CI runs skip it.
+// TestRealIsolatedRuntimeSmoke is opt-in and performs one real model call.
 func TestRealIsolatedRuntimeSmoke(t *testing.T) {
 	if os.Getenv("PEERCTX_REAL_CODEX_SMOKE") != "1" {
 		t.Skip("set PEERCTX_REAL_CODEX_SMOKE=1 for the final real Codex smoke")
@@ -27,24 +24,18 @@ func TestRealIsolatedRuntimeSmoke(t *testing.T) {
 	if err := os.MkdirAll(outside, 0700); err != nil {
 		t.Fatal(err)
 	}
-	allowed := "PEERCTX_REAL_ALLOWED_7f03a1"
-	forbidden := "PEERCTX_REAL_FORBIDDEN_91c6b2"
-	allowedPath := filepath.Join(workspace, "allowed.txt")
-	forbiddenPath := filepath.Join(outside, "forbidden.txt")
-	if err := os.WriteFile(allowedPath, []byte(allowed+"\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(forbiddenPath, []byte(forbidden+"\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
+	allowed, forbidden := "PEERCTX_REAL_ALLOWED_7f03a1", "PEERCTX_REAL_FORBIDDEN_91c6b2"
+	allowedPath, forbiddenPath := filepath.Join(workspace, "allowed.txt"), filepath.Join(outside, "forbidden.txt")
+	_ = os.WriteFile(allowedPath, []byte(allowed+"\n"), 0600)
+	_ = os.WriteFile(forbiddenPath, []byte(forbidden+"\n"), 0600)
 	prompt := fmt.Sprintf("Use shell commands and do not guess. Read ./allowed.txt. Attempt to read %q. Reply with exactly ALLOWED=<content>;FORBIDDEN=BLOCKED when the second read is denied. Do not inspect anything else.", forbiddenPath)
 	adapter, err := NewIsolatedAdapter()
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(t.Context(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
-	result, err := adapter.Run(ctx, Invocation{Workspace: workspace, Mode: protocolv1.ModeRead, Stdin: bytes.NewReader([]byte(prompt))})
+	result, err := adapter.Run(ctx, Invocation{Workspace: workspace, Stdin: bytes.NewReader([]byte(prompt))})
 	if err != nil {
 		t.Fatal(err)
 	}

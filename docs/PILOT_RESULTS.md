@@ -1,10 +1,13 @@
-# M5 试点验收记录
+# v1 历史试点记录与 LAN v2 待验收项
+
+> 本页前半部分是 `0.1.1` Relay/write 方向的历史证据，不是 LAN-first v2 的产品验证，也不能用旧 fake Codex 10/10 代替新用户激活试点。
 
 自动化预试点覆盖 PRD 的 10 类跨仓库 Case：API 契约、共享模型、认证规则、部署配置、内部 SDK、组件约束、跨仓库故障、迁移兼容、测试 fixture 和双边批准的跨仓库修改。
 
 运行：
 
 ```bash
+git checkout v0.1.1
 go test ./internal/relayclient -run TestTenCrossRepositoryPilotFixturesCloseInOneRequestWithSafetyGuards
 ```
 
@@ -31,3 +34,9 @@ PEERCTX_REAL_CODEX_SMOKE=1 go test -v -count=1 -timeout 4m ./internal/codex -run
 为避免 Codex 高频更新导致持续维护版本白名单，Runtime 后续改为启动时能力门禁，并在当前 `0.150.0-alpha.8` 上再次实跑通过。门禁不比较版本字符串，而是实际检查必需 exec 参数、认证桥接、read 模式不可写且不可越界，以及 write 模式只能写 workspace、Git 元数据只读、仓库外不可读写。能力门禁落地后的最终正式 smoke 在 18.64 秒内通过；完整 3 轮 Spike 继续保留为平台和发布证据。
 
 `peerctx 0.1.1` 发布候选在相同环境中再次执行正式 smoke，并于 16.38 秒内通过。
+
+## LAN v2 当前证据
+
+自动化集成测试使用两套独立配置目录模拟两台 Mac，已覆盖 create 自动启动宿主、join 只使用完整邀请、Agent 自动上线、首次 ask、请求字节不变，以及正文/回答/仓库路径不进入宿主数据库。
+
+这仍不等于真实双人激活验收。`0.2.0` 发布前必须补齐 10 组 Apple Silicon Mac 双人试点，至少 8 组在 5 分钟内完成，且不手工配置 URL、端口、证书、静态 IP 或常驻终端；同时补齐真实登录恢复、macOS 网络权限提示和 mDNS 被禁用网络的记录。

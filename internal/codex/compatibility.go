@@ -28,8 +28,7 @@ func probeRuntimeCapabilities(codexPath, hostAuth string, runner capabilityComma
 	tmp := filepath.Join(root, "tmp")
 	workspace := filepath.Join(root, "workspace")
 	outside := filepath.Join(root, "outside")
-	gitCommon := filepath.Join(root, "git-common")
-	for _, dir := range []string{home, codexHome, tmp, workspace, outside, gitCommon} {
+	for _, dir := range []string{home, codexHome, tmp, workspace, outside} {
 		if err = os.MkdirAll(dir, 0700); err != nil {
 			return capabilityProbeError("isolated_runtime_unavailable", "The runtime capability probe could not prepare its temporary directories", err)
 		}
@@ -39,11 +38,9 @@ func probeRuntimeCapabilities(codexPath, hostAuth string, runner capabilityComma
 	}
 
 	const allowed = "peerctx-capability-allowed"
-	const metadata = "peerctx-capability-git-metadata"
 	allowedPath := filepath.Join(workspace, "allowed.txt")
 	outsidePath := filepath.Join(outside, "outside.txt")
-	metadataPath := filepath.Join(gitCommon, "metadata.txt")
-	for path, value := range map[string]string{allowedPath: allowed, outsidePath: "must-stay-private", metadataPath: metadata} {
+	for path, value := range map[string]string{allowedPath: allowed, outsidePath: "must-stay-private"} {
 		if err = os.WriteFile(path, []byte(value+"\n"), 0600); err != nil {
 			return capabilityProbeError("isolated_runtime_unavailable", "The runtime capability probe could not prepare its canaries", err)
 		}
@@ -75,16 +72,6 @@ func probeRuntimeCapabilities(codexPath, hostAuth string, runner capabilityComma
 		return capabilityProbeError("codex_read_isolation_probe_failed", "Codex did not enforce the read isolated_runtime filesystem boundary", capabilityCommandFailure(runErr, stdout, stderr))
 	}
 
-	if err = os.WriteFile(filepath.Join(codexHome, "config.toml"), []byte(isolatedWriteConfigFor(home, tmp, gitCommon)), 0600); err != nil {
-		return capabilityProbeError("isolated_runtime_unavailable", "The runtime capability probe could not write its write profile", err)
-	}
-	stdout, stderr, runErr = runner(ctx, codexPath, env, workspace,
-		"sandbox", "--permission-profile", "peerctx-write", "--cd", workspace,
-		"/bin/sh", "-c", writeCapabilityScript, "peerctx-write-probe", gitCommon, outsidePath, outside)
-	wantWriteOutput := allowed + "|" + metadata
-	if runErr != nil || strings.TrimSpace(string(stdout)) != wantWriteOutput || !pathExists(filepath.Join(workspace, "write-profile-write-probe")) || pathExists(filepath.Join(gitCommon, "git-write-probe")) || pathExists(filepath.Join(outside, "outside-write-probe")) {
-		return capabilityProbeError("codex_write_isolation_probe_failed", "Codex did not enforce the write isolated_runtime filesystem boundary", capabilityCommandFailure(runErr, stdout, stderr))
-	}
 	return nil
 }
 
@@ -134,14 +121,4 @@ allowed=$(/bin/cat ./allowed.txt)
 if /bin/cat "$1" >/dev/null 2>&1; then exit 41; fi
 if /usr/bin/touch ./read-profile-write-probe >/dev/null 2>&1; then exit 42; fi
 /usr/bin/printf '%s' "$allowed"
-`
-
-const writeCapabilityScript = `set -eu
-allowed=$(/bin/cat ./allowed.txt)
-metadata=$(/bin/cat "$1/metadata.txt")
-/usr/bin/touch ./write-profile-write-probe
-if /usr/bin/touch "$1/git-write-probe" >/dev/null 2>&1; then exit 51; fi
-if /bin/cat "$2" >/dev/null 2>&1; then exit 52; fi
-if /usr/bin/touch "$3/outside-write-probe" >/dev/null 2>&1; then exit 53; fi
-/usr/bin/printf '%s|%s' "$allowed" "$metadata"
 `

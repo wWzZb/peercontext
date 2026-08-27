@@ -9,43 +9,36 @@ peerctx agent list
 peerctx agent get AGENT
 ```
 
-Published Manifests contain a human-written name, summary, tags, capabilities, modes, and online state. They never contain the provider repository path. Select an Agent from those fields; do not ask the CLI to select one.
+Published v2 Manifests contain a name, optional summary, tags, capabilities, owner member and online state. They never contain the provider repository path. Select an Agent from these fields; do not ask the CLI to select one.
 
 ## Read
 
 ```text
-peerctx ask AGENT --mode read [--timeout 5m] [--request-id REQUEST_ID]
-peerctx request get REQUEST_ID
-peerctx request cancel REQUEST_ID
+peerctx ask AGENT [--timeout 5m] [--request-id REQUEST_ID]
 ```
 
-The request body is stdin. In v1 JSON, `response.answer` is standard Base64 containing the provider Codex final-message bytes. A replay can return only `metadata` with `replayed:true`, because Relay does not store answers.
+The request body is stdin. There is no `--mode` flag. In JSON, `data.response.answer` is standard Base64 containing the provider Codex final-message bytes.
 
-## Write
-
-```text
-peerctx task AGENT --mode write [--approval-timeout 10m] [--run-timeout 15m]
-peerctx task AGENT --mode write --confirm CONFIRMATION_TOKEN
-```
-
-The first call exits `10`, writes a `write_confirmation_required` error envelope, and sends no write request. Its `error.details` contains `confirmation` and `confirmation_token`. The second call must receive byte-identical stdin before the confirmation expires.
-
-Provider-side approval commands are intentionally not part of this request-side Skill. A successful write response may include `response.worktree` with a worktree ID and base commit, but never a provider-local path.
-
-## Answer handling
-
-Only this shape is an answer:
+Only a successful response object is an answer:
 
 ```json
 {
   "ok": true,
   "data": {
+    "schema_version": 2,
     "response": {
+      "schema_version": 2,
+      "request_id": "req_...",
       "status": "succeeded",
       "answer": "Base64 bytes"
-    }
+    },
+    "replayed": false
+  },
+  "meta": {
+    "request_id": "req_...",
+    "version": "0.2.0"
   }
 }
 ```
 
-Metadata, approval state, errors, and transport failures are not answers.
+Errors, connection state and Agent metadata are not answers.
