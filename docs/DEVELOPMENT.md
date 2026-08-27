@@ -5,7 +5,7 @@
 开始修改前完整阅读 [PRD](./PRD.md) 和 [Runtime Spike 结果](../spikes/codex-runtime/RESULT.md)。
 
 - CLI 与 `peer-context` Skill 是独立层；CLI 不理解请求语义，不读仓库，不改写提示词。
-- Skill 只显式触发，只调用公开 CLI，不参与后台服务或入站 Codex。
+- Skill 只显式触发，覆盖全部公开 CLI；它可以在正常工作环境中理解用户意图和仓库语义，但不直接调用后台内部接口，也不进入提供端入站 Codex。
 - v2 只支持 read，Runtime 固定为 `isolated_runtime`。
 - 请求正文逐字节进入 Codex stdin；数据库与日志不保存请求、回答、私钥或仓库路径。
 - 网络仅允许直接局域网，传输明文但所有请求、响应和帧都必须签名。

@@ -16,6 +16,7 @@ func main() {
 		"agents/openai.yaml",
 		"references/cli-contract.md",
 		"references/error-handling.md",
+		"references/repository-sharing.md",
 		"references/request-patterns.md",
 	}
 	sort.Strings(paths)

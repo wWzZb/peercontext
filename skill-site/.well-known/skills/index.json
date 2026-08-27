@@ -2,12 +2,13 @@
   "skills": [
     {
       "name": "peer-context",
-      "description": "Help request-side Codex explicitly discover a LAN PeerContext Agent and ask it for a missing private cross-repository fact. Use only when the user explicitly invokes $peer-context; do not use for ordinary local work, Project setup, Agent registration, background service management, or provider-side inbound Codex.",
+      "description": "Help Codex explicitly operate the complete public PeerContext LAN CLI in the user's normal workspace, including Project setup, repository sharing, service management, Agent discovery, and read requests. Use only when the user explicitly invokes $peer-context; do not use for ordinary local work or provider-side inbound Codex.",
       "files": [
         "SKILL.md",
         "agents/openai.yaml",
         "references/cli-contract.md",
         "references/error-handling.md",
+        "references/repository-sharing.md",
         "references/request-patterns.md"
       ]
     }

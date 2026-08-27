@@ -67,7 +67,7 @@ peerctx version
 
 ## Codex Skill
 
-人直接使用 CLI 不需要 Skill。只有希望请求端 Codex 主动选择 Agent、组织最小问题并发送 read 时，才安装 `peer-context` Skill；它必须通过 `$peer-context` 显式触发，不会参与后台服务或入站 Codex。
+人直接使用 CLI 不需要 Skill。安装 `peer-context` Skill 后，正常工作环境中的 Codex 可以通过全部公开 CLI 创建或加入 Project、生成邀请、分析并注册当前仓库、管理成员与后台服务，以及选择 Agent 发起 read。它必须通过 `$peer-context` 显式触发；注册仓库前会展示公开资料和 Project 全员只读范围，入站隔离 Codex 不加载该 Skill。
 
 开发版本的 Skill 源文件位于 [`.agents/skills/peer-context`](./.agents/skills/peer-context)。
 

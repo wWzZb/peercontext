@@ -13,3 +13,7 @@ Never turn infrastructure states into business conclusions.
 | `recursive_request_blocked` | This is provider-side inbound Codex | Stop; do not attempt another Agent |
 
 PeerContext does not keep an offline queue or persist past answers.
+
+For local setup or service failures, run `peerctx service status` once and report its structured state. Use `service start` or `restart` only when the user requested recovery or the status shows the background service should be running. Do not automatically call `service stop`, remove a member, or remove an Agent as a troubleshooting shortcut.
+
+Invitation contents and local repository paths are not diagnostic details for third parties. Do not include them in logs, issue text, or unrelated summaries.

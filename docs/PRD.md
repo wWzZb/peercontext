@@ -17,12 +17,13 @@
 |---|---|---|
 | 1.0.0 | 2026-08-25 | 以独立自托管 Relay 为前置条件的初版 MVP |
 | 2.0.0 Draft | 2026-08-27 | 重置为 LAN-first：创建 Project、发送邀请、同事加入即可使用；移除公网 Relay 与 write |
+| 2.0.0 Draft | 2026-08-27 | 将显式 `peer-context` Skill 扩展为完整公开 CLI 使用层；提供端入站 Runtime 仍不加载 Skill |
 
 > `0.1.1` 是旧方向的实现，不能作为本 PRD 的验收基线。v2 不迁移 v1 Project 或 credential，也不会删除它们。
 
 ## 1. 执行摘要
 
-PeerContext v2 是给同一局域网内、使用 Codex 且代码分散在不同私有仓库中的开发者使用的协作工具。开发者创建 Project 后，PeerContext 自动在其 Mac 上托管 Project 并返回一段完整邀请；同事粘贴邀请即可加入，显式共享本地仓库为 Agent，Project 成员随后可以发起只读查询。用户不需要部署服务器、填写 Relay URL、配置端口或证书，也不需要维护常驻终端。
+PeerContext v2 是给同一局域网内、使用 Codex 且代码分散在不同私有仓库中的开发者使用的协作工具。开发者创建 Project 后，PeerContext 自动在其 Mac 上托管 Project 并返回一段完整邀请；同事粘贴邀请即可加入，显式共享本地仓库为 Agent，Project 成员随后可以发起只读查询。用户可以直接使用 CLI，也可以在正常交互式工作环境中显式启用 `peer-context` Skill，让 Codex 理解并完成全部公开 CLI 操作。用户不需要部署服务器、填写 Relay URL、配置端口或证书，也不需要维护常驻终端。
 
 MVP 的首要目标不是证明路由基础设施能运行，而是验证两个第一次使用的开发者能否在已经安装 PeerContext、登录 Codex 且处于同一局域网的前提下，5 分钟内完成创建、加入、共享 Agent 和第一次成功 read。仓库权限不扩散；请求正文逐字节进入提供方的隔离 Codex Runtime；Project Host 不持久化请求正文或回答。
 
@@ -77,9 +78,11 @@ PeerContext `0.1.1` 虽然验证了隔离 Runtime 和跨仓库链路，却要求
 
 > 我希望加入同事的 Project，选择一个仓库共享 read 能力，然后回到正常开发，不维护后台终端。
 
-### 请求端 Codex
+### 交互式工作环境中的 Codex
 
-只有在用户显式启用 `peer-context` Skill 后，才发现 Agent、组织最小必要问题并调用公开 CLI。Skill 不创建 Project、不加入 Project、不管理后台服务，也不参与提供端入站 Runtime。
+用户显式启用 `peer-context` Skill 后，Codex 可以通过全部公开 `peerctx` CLI 完成 Project 创建与加入、成员管理、仓库 Agent 注册与管理、后台服务诊断以及跨仓库 read。Skill 可以在用户授权的当前工作区中理解仓库语义并建议 Agent 的 `name`、`summary`、`tags` 和 `capabilities`；CLI 本身仍不读取或解释仓库内容。
+
+提供端收到远端请求后启动的隔离 Codex Runtime 不加载该 Skill，也不能创建递归 PeerContext 请求。它只接收本次 stdin，在授权仓库中完成只读回答。
 
 ## 4. 战略背景与产品原则
 
@@ -96,7 +99,7 @@ PeerContext `0.1.1` 虽然验证了隔离 Runtime 和跨仓库链路，却要求
 - **安全细节自动化：** 自动生成身份、签名和后台服务，不要求证书或长期 token；
 - **显式共享仓库：** 加入 Project 不读取任何仓库，只有 `agent register` 才共享指定路径；
 - **Project 即 read 信任域：** 已共享 Agent 默认可被全部 Project 成员读取；
-- **CLI/Skill 分层：** CLI 只做基础设施，Skill 只在请求端解释何时和如何协作；
+- **CLI/Skill 分层：** CLI 只做基础设施；显式 Skill 在正常交互式工作环境中理解用户意图、仓库语义和全部公开 CLI，但不进入提供端入站 Runtime；
 - **没有写能力：** v2 MVP 不提供 write、worktree、commit、merge、push 或 PR。
 
 ## 5. 方案总览
@@ -186,6 +189,19 @@ peerctx version
 
 默认仍输出单个 JSON envelope。移除 `relay`、`credential`、`agent serve/access`、`task`、write 审批、worktree、`--relay`、`--credential-file`、`--invite-token` 和 `--mode`。成员显示名由 `--member` 覆盖；否则优先使用 Git `user.name`，再使用 macOS 用户名。
 
+### 5.7 Skill 与提供端 Runtime 边界
+
+`peer-context` 是显式触发的公开 CLI 使用层，覆盖 5.6 中的全部命令。它根据用户目标选择命令、解析 JSON 信封、处理基础设施错误，并在用户授权的正常工作区内理解必要的本地仓库信息。它不得导入 Go 内部包、直接调用 LAN HTTP/WS 接口或绕过 CLI。
+
+操作规则：
+
+- `project list`、`project member list`、`agent list|get`、`service status`、`skills list|read` 和 `version` 等只读命令可直接执行；
+- 用户明确要求后，Skill 可执行 Project 创建、加入、邀请、切换以及服务启动或重启；邀请属于敏感的一次性凭据，不得写入日志或无关输出；
+- 注册 Agent 前，Skill 可以阅读当前仓库中完成描述所需的最少文件，生成 `name`、`summary`、`tags` 和 `capabilities` 候选；必须展示候选 Manifest，说明注册后 Project 全体成员可通过 Codex 只读查询该仓库，并在得到明确确认后调用 `agent register`；
+- 删除 Agent、移除成员或停止服务前，必须确认准确目标和影响；
+- `ask` 只在用户明确要求跨仓库查询后发送最少必要上下文，基础设施状态不得被当成仓库事实；
+- Skill 不提供任何 write 能力，也不参与提供端入站 Runtime。入站 Runtime 使用干净 `CODEX_HOME`，不加载个人 Skill，并由递归门禁阻止 `peerctx ask`。
+
 ## 6. 成功指标
 
 ### 主要指标
@@ -239,6 +255,8 @@ peerctx version
 
 - CLI 不读取仓库内容；
 - 路径必须是本机 Git worktree；
+- 显式 Skill 可以读取用户授权工作区中的必要仓库文件，生成可编辑的 `name`、`summary`、`tags` 和 `capabilities` 候选；
+- Skill 在注册前展示候选 Manifest 和“Project 全体成员可只读查询”的影响，并取得明确确认；
 - 注册后后台服务自动建立 WS；
 - 终端关闭或用户重新登录后 Agent 自动恢复；
 - 删除 Agent 后立即停止共享。
@@ -257,12 +275,15 @@ peerctx version
 - `service start|stop|restart` 可重复执行；
 - 错误不得包含私钥、邀请私钥、正文或本地仓库路径。
 
-### US-06：显式 Skill
+### US-06：显式完整 CLI Skill
 
-- `peer-context` 仍为显式触发；
-- 只调用 `agent list|get` 和 `ask` 的公开 v2 CLI；
-- 不启动服务、不创建/加入 Project；
-- 不提及 Relay、write、审批或 worktree；
+- `peer-context` 仍为显式触发，不参与普通本地工作；
+- 覆盖 5.6 中全部公开 v2 CLI，并按只读、状态变更、共享和破坏性操作执行相应确认规则；
+- 只能调用公开 `peerctx` CLI，不导入内部包、不直连 LAN HTTP/WS；
+- 能在正常交互式工作环境中完成 create → join → register → ask 等用户流程；
+- Agent 注册前生成并展示可编辑 Manifest，确认 Project 全员只读共享范围后才执行；
+- 提供端入站 Runtime 不加载 Skill，出现 `recursive_request_blocked` 时立即停止；
+- 不提及或调用 Relay、write、审批、request、worktree 等已移除公共面；
 - 基础设施错误不得伪装为业务答案。
 
 ### 关键边界 Case
@@ -295,8 +316,8 @@ peerctx version
 - Linux、Windows、Intel Mac；
 - v1 Project、credential 或 Agent 迁移；
 - 全局账号、跨 Project 身份或多设备合并；
-- 自动仓库描述、索引、RAG、Embedding、Memory；
-- CLI 语义理解、Agent 自动选择或 Prompt 改写；
+- CLI 或后台服务自动读取仓库、持续索引、RAG、Embedding、Memory；显式 Skill 经用户授权为注册生成一次性 Manifest 候选属于范围内；
+- CLI 语义理解、Agent 自动选择或 Prompt 改写；Skill 依据公开 Manifest 和用户意图选择命令与 Agent 属于范围内；
 - Agent 递归请求与多级编排。
 
 ## 9. 依赖、风险与缓解
@@ -312,6 +333,7 @@ peerctx version
 | 设备私钥泄漏 | 成员被冒充 | Keychain 保存；Owner 可移除成员并重新邀请 |
 | Codex CLI 变化 | Runtime 不可用或隔离失效 | 启动能力门禁和真实 Runtime smoke；失败拒绝 Agent 上线 |
 | 旧 v1 状态存在 | 新旧语义混淆 | 使用独立 v2 状态目录，保留但不读取 v1 |
+| Skill 误共享仓库或发布不准确 Manifest | Project 全员获得非预期只读查询能力，或后续选错 Agent | 注册前展示本地路径、公开 Manifest 和共享范围，取得明确确认；不确定字段留空或标明待用户修改 |
 
 ## 10. 开放问题
 
@@ -327,7 +349,7 @@ peerctx version
 1. 协议 v2、邀请签名、Project 设备密钥和独立状态目录；
 2. 内嵌 Project Host、签名 HTTP/WS 和 Project-wide read；
 3. LaunchAgent、Unix socket、自动 Agent 生命周期和 mDNS；
-4. v2 CLI、Skill 与全部文档；
+4. v2 CLI、覆盖全部公开命令的显式 Skill 与全部文档；
 5. 删除 v1 Relay/write/worktree 公共面；
 6. 自动化安全测试、macOS arm64 真实 smoke 和 10 组双人激活。
 
