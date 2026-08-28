@@ -11,7 +11,7 @@
 | P0 | 人类可读输出与 `--json` | Planned | 人直接使用时清楚，Skill 和脚本仍有稳定结构化输出 |
 | P0 | 完整帮助入口 | Planned | 用户不查文档也能发现命令和参数 |
 | P1 | 列表表格与统一格式选项 | Planned | Project、Member 和 Agent 列表更容易浏览 |
-| P1 | 错误诊断改进 | Planned | 用人话区分宿主离线、Agent 离线、防火墙和发现失败 |
+| P1 | 稳定错误码与自救诊断 | Planned | 保留具体失败原因，并给出用户可执行的恢复建议 |
 | P2 | Shell completion | Planned | 补全命令、子命令和静态参数，不补全邀请或敏感信息 |
 | Future | SSH-like 主机直连研究 | Planned | 在不提供产品公网服务的前提下，由目标设备监听并接受已授权成员直连 |
 | Future | Write 协作研究 | Planned | 在 read 模式验证价值后，单独评估安全、可审阅的远程修改流程 |
@@ -66,12 +66,33 @@ peerctx project create --help
 
 三条命令都以退出码 `0` 返回对应层级的帮助，不返回 `unknown_command`，也不创建或修改任何 PeerContext 状态。
 
-## CLI-UX-03：列表与诊断体验
+## CLI-UX-03：列表与状态体验
 
 - `project list`、`project member list` 和 `agent list` 在默认模式下使用对齐、可扫读的列表；
 - `--json` 始终保留完整字段，不因人类展示取舍而丢失数据；
 - `service status` 汇总后台服务、Host、发现和 Agent 状态；
-- 常见网络错误给出可执行的检查建议，但不建议用户配置 Relay、公网地址、证书或静态 IP。
+
+## CLI-UX-04：稳定错误码与自救诊断
+
+### 当前问题
+
+CLI 当前会根据错误文本把具体失败压缩成 `expired`、`conflict`、`unavailable` 等通用错误码。邀请过期、邀请已使用、Project Host 离线和 Agent 离线因此难以准确区分，既影响用户自救，也会让试点记录丢失真实失败原因。
+
+### 计划方向
+
+- 从协议、Host、本地服务到 CLI 保留结构化错误类型，不依赖错误文本匹配来判断已知失败；
+- 对齐 PRD 已定义的稳定错误码，至少覆盖 `invite_expired`、`invite_consumed`、`project_host_offline`、`agent_offline`、`host_identity_mismatch`、`invalid_invitation`、`request_replayed`、`clock_skew` 和 `lan_discovery_unavailable`；
+- 人类可读输出针对具体原因给出下一步，例如重新创建邀请、确认 Host 在线、检查 Agent 所在设备或确认两台 Mac 仍在同一局域网；
+- `--json` 保留稳定的 `error.code`、退出码和 `retryable`，供 Skill、脚本与试点统计可靠处理；
+- 诊断不得建议配置 Relay、公网地址、证书或静态 IP，也不得泄露邀请、私钥、请求正文、回答或本地仓库路径。
+
+### 验收条件
+
+1. 邀请过期与邀请已使用分别返回 `invite_expired` 和 `invite_consumed`，不会合并为通用超时或冲突；
+2. Host 离线与 Agent 离线分别返回 `project_host_offline` 和 `agent_offline`，并给出不同的恢复建议；
+3. 身份不匹配、nonce 重放、时钟偏差和 mDNS 不可用均返回 PRD 对应的稳定错误码；
+4. `peer-context` Skill 按 `error.code` 处理失败，不通过英文错误文本猜测原因，也不把基础设施错误当成仓库事实；
+5. CLI 单元测试和端到端测试覆盖上述错误码、退出码、`retryable` 与敏感信息不泄露。
 
 ## NET-FUTURE-01：SSH-like 用户主机直连研究
 
