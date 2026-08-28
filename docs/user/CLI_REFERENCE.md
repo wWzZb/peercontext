@@ -1,6 +1,6 @@
 # peerctx CLI 命令参考
 
-本文面向直接使用 PeerContext 的用户，介绍当前 `peerctx 0.2.0-alpha.1` 提供的命令。完整使用流程见 [第一次局域网协作](./QUICKSTART.md)。
+本文面向直接使用 PeerContext 的用户，介绍当前 `peerctx 0.2.0-alpha.2` 提供的命令。完整使用流程见 [第一次局域网协作](./QUICKSTART.md)。
 
 ## 输出与帮助
 

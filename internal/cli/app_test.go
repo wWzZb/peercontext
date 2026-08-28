@@ -20,7 +20,7 @@ func TestVersionReportsLANV2(t *testing.T) {
 		t.Fatal(err)
 	}
 	data := envelope["data"].(map[string]any)
-	if data["version"] != "0.2.0-alpha.1" || data["protocol_version"] != "v2" || data["schema_version"] != float64(2) {
+	if data["version"] != "0.2.0-alpha.2" || data["protocol_version"] != "v2" || data["schema_version"] != float64(2) {
 		t.Fatalf("version data = %#v", data)
 	}
 }
@@ -30,7 +30,7 @@ func TestDefaultVersionIsHumanReadable(t *testing.T) {
 	if code := Run([]string{"version"}, bytes.NewReader(nil), &stdout, &stderr); code != clioutput.ExitOK {
 		t.Fatalf("exit=%d stderr=%s", code, stderr.String())
 	}
-	if !bytes.Contains(stdout.Bytes(), []byte("peerctx 0.2.0-alpha.1")) || bytes.HasPrefix(stdout.Bytes(), []byte("{")) {
+	if !bytes.Contains(stdout.Bytes(), []byte("peerctx 0.2.0-alpha.2")) || bytes.HasPrefix(stdout.Bytes(), []byte("{")) {
 		t.Fatalf("human version output = %q", stdout.String())
 	}
 }

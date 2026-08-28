@@ -69,4 +69,4 @@ npm test
 
 ## 发布门禁
 
-本轮不发布 npm 或 GitHub Release。正式发布前还需要在真实 Apple Silicon Mac 上完成 LaunchAgent 安装/重启/登录恢复、真实隔离 Codex smoke，以及 10 组双人首次激活试点中至少 8 组在 5 分钟内完成且无手工网络配置。
+`0.2.0-alpha.*` 可作为明确标记的预发布用于测试。`0.2.0` 正式发布前还需要在真实 Apple Silicon Mac 上完成 LaunchAgent 安装/重启/登录恢复、真实隔离 Codex smoke，以及 10 组双人首次激活试点中至少 8 组在 5 分钟内完成且无手工网络配置。
