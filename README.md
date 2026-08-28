@@ -1,5 +1,7 @@
 # PeerContext
 
+简体中文 | [English](./README.en.md)
+
 PeerContext 是一个给开发者用的局域网协作工具：你创建 Project，把完整邀请发给同一局域网里的同事，同事加入后就能共享自己明确注册的本地仓库 Agent。没有公网服务器，也不用配置 Relay URL、端口、证书或静态 IP。
 
 PeerContext 当前支持 Apple Silicon Mac、同一直接局域网和只读查询。
