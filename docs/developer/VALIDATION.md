@@ -24,6 +24,8 @@
 
 正式 `IsolatedAdapter` 的真实 smoke 也验证了：授权仓库可读、仓库没有被修改、仓库外 canary 不可读、最终回答不泄漏禁止 canary。真实 smoke 需要联网并可能产生模型费用，因此默认不在日常测试和 CI 中执行。
 
+2026-08-28 在 `0.2.0-alpha.1` 发布前，使用当前 `codex-cli 0.150.0-alpha.12.2` 再次执行真实 smoke，结果为 PASS（15.98 秒）。
+
 运行方式：
 
 ```shell

@@ -1,6 +1,6 @@
 {
   "name": "peerctx",
-  "version": "0.2.0",
+  "version": "0.2.0-alpha.1",
   "description": "LAN-first private repository collaboration for Apple Silicon Mac",
   "license": "MIT",
   "homepage": "https://github.com/wWzZb/peercontext#readme",

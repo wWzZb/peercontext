@@ -22,7 +22,7 @@ go test ./...
 go install ./cmd/peerctx
 ```
 
-`0.2.0` 未发布，不使用 npm 或 GitHub Release 安装。
+`0.2.0` 正式版尚未发布；当前测试版本按 README 从源码安装，不使用 npm 包内二进制。
 
 ## 运行与调试
 

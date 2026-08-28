@@ -2,4 +2,4 @@
 // binary, embedded Skill metadata, and npm wrapper.
 package version
 
-const Current = "0.2.0"
+const Current = "0.2.0-alpha.1"

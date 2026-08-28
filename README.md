@@ -10,29 +10,33 @@ PeerContext 当前支持 Apple Silicon Mac、同一直接局域网和只读查�
 
 两台 Mac 都需要完整安装 PeerContext（`peerctx` CLI 和 `peer-context` Skill）、安装并登录 Codex CLI，并连接同一个局域网。
 
-创建者执行：
+推荐双方打开新的 Codex 对话并显式使用 `$peer-context`。创建者发送：
 
-```shell
-peerctx project create --name backend-team
+```text
+$peer-context 创建一个名为 backend-team 的 PeerContext Project，把完整邀请和下一步给我。
 ```
 
-把 JSON 中 `data.invitation` 的完整内容发给同事。同事执行：
+把返回的完整邀请发给同事。同事发送：
 
-```shell
-peerctx project join 'peerctx2_...'
-peerctx agent register /absolute/path/to/repository
+```text
+$peer-context 加入这个 PeerContext 邀请：peerctx2_...
 ```
 
-Agent 注册后自动上线，不需要保留终端。创建者查看并询问：
+同事进入准备共享的仓库，先让 Skill 展示公开 Manifest 和共享范围，确认后再注册：
 
-```shell
-peerctx agent list
-printf '%s\n' '请告诉我订单查询接口的必填参数。' | peerctx ask MEMBER/REPOSITORY
+```text
+$peer-context 分析当前仓库并给出 Agent Manifest 候选，等我确认后再注册。
+```
+
+Agent 注册后自动上线，不需要保留终端。创建者发送：
+
+```text
+$peer-context 查看当前 Project 中的 Agent，并向最匹配的 Agent 询问订单查询接口的必填参数。
 ```
 
 首次启动后台服务时，macOS 可能显示一次入站网络权限提示，这是正常激活步骤。
 
-完整过程见 [Quickstart](./docs/user/QUICKSTART.md)。
+完整过程见 [Quickstart](./docs/user/QUICKSTART.md)。需要直接使用 CLI 时见 [命令参考](./docs/user/CLI_REFERENCE.md)。
 
 ## 它怎么工作
 

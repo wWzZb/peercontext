@@ -10,29 +10,33 @@ PeerContext currently supports Apple Silicon Macs, peers on the same directly co
 
 Both Macs need the complete PeerContext installation (`peerctx` CLI and `peer-context` Skill), the Codex CLI installed and signed in, and a connection to the same local network.
 
-The Project creator runs:
+Both people should open a new Codex conversation and explicitly invoke `$peer-context`. The Project creator sends:
 
-```shell
-peerctx project create --name backend-team
+```text
+$peer-context Create a PeerContext Project named backend-team, then give me the complete invitation and the next step.
 ```
 
-Send the complete `data.invitation` value from the JSON output to your colleague. They run:
+Send the complete invitation to your colleague. They send:
 
-```shell
-peerctx project join 'peerctx2_...'
-peerctx agent register /absolute/path/to/repository
+```text
+$peer-context Join this PeerContext invitation: peerctx2_...
 ```
 
-The Agent comes online automatically after registration, so there is no terminal to keep open. The creator can list the Agent and ask it a question:
+Your colleague opens the repository they intend to share and asks the Skill to preview its public Manifest and sharing scope before registration:
 
-```shell
-peerctx agent list
-printf '%s\n' 'What are the required parameters for the order query API?' | peerctx ask MEMBER/REPOSITORY
+```text
+$peer-context Analyze the current repository and propose an Agent Manifest. Wait for my confirmation before registering it.
+```
+
+The Agent comes online automatically after registration, so there is no terminal to keep open. The creator sends:
+
+```text
+$peer-context List the Agents in the current Project and ask the best match for the required parameters of the order query API.
 ```
 
 The first time the background service starts, macOS may show an incoming network connection prompt. This is an expected part of activation.
 
-See the [Quickstart](./docs/user/QUICKSTART.md) for the complete flow.
+See the [Quickstart](./docs/user/QUICKSTART.md) for the complete flow. To use the CLI directly, see the [command reference](./docs/user/CLI_REFERENCE.md).
 
 ## How it works
 

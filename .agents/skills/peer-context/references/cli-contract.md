@@ -59,7 +59,7 @@ Only a successful response object is an answer:
   },
   "meta": {
     "request_id": "req_...",
-    "version": "0.2.0"
+    "version": "0.2.0-alpha.1"
   }
 }
 ```
