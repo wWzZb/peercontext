@@ -54,10 +54,10 @@ npx skills add https://wwzzb.github.io/peercontext/ --skill peer-context --agent
 ## 4. 验证并报告
 
 ```shell
-peerctx version
-peerctx service status
+peerctx --json version
+peerctx --json service status
 ```
 
-尚未使用 PeerContext 时，`service status` 返回 `running:false` 是正常的。不要为了改变该状态而创建 Project 或启动业务流程。
+尚未使用 PeerContext 时，JSON 中的 `data.running:false` 是正常的。不要为了改变该状态而创建 Project 或启动业务流程。
 
 完成后只向用户报告：CLI 版本、服务状态、Skill 是否安装成功，以及仍需用户处理的步骤。提醒用户新开一个 Codex 对话，并通过 `$peer-context` 显式使用 Skill。

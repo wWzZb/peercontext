@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wWzZb/peercontext/internal/codex"
 	"github.com/wWzZb/peercontext/internal/discovery"
+	"github.com/wWzZb/peercontext/internal/failure"
 	"github.com/wWzZb/peercontext/internal/lanhost"
 	"github.com/wWzZb/peercontext/internal/v2state"
 	protocolv2 "github.com/wWzZb/peercontext/pkg/protocol/v2"
@@ -66,13 +67,14 @@ type Daemon struct {
 	cancel     context.CancelFunc
 	mu         sync.Mutex
 	providers  map[string]context.CancelFunc
+	connected  map[string]bool
 }
 
 func NewDaemon(manager *v2state.Manager, runtimeAdapter Runtime) *Daemon {
 	if runtimeAdapter == nil {
 		runtimeAdapter = &CodexRuntime{}
 	}
-	return &Daemon{State: manager, Runtime: runtimeAdapter, providers: map[string]context.CancelFunc{}}
+	return &Daemon{State: manager, Runtime: runtimeAdapter, providers: map[string]context.CancelFunc{}, connected: map[string]bool{}}
 }
 
 func (d *Daemon) Run(ctx context.Context) error {
@@ -187,7 +189,15 @@ func (d *Daemon) dispatchControl(ctx context.Context, command Command) (any, err
 				hosted++
 			}
 		}
-		return map[string]any{"schema_version": 2, "running": true, "listen": d.lan.Addr().String(), "mdns": d.mdnsError == nil, "projects": len(state.Profiles), "hosted_projects": hosted, "local_agents": len(state.Agents)}, nil
+		d.mu.Lock()
+		online := 0
+		for _, connected := range d.connected {
+			if connected {
+				online++
+			}
+		}
+		d.mu.Unlock()
+		return map[string]any{"schema_version": 2, "running": true, "listen": d.lan.Addr().String(), "mdns": d.mdnsError == nil, "projects": len(state.Profiles), "hosted_projects": hosted, "local_agents": len(state.Agents), "agent_connections": map[string]int{"online": online, "offline": len(state.Agents) - online}}, nil
 	case ActionProjectCreate:
 		var input ProjectCreateInput
 		if err := json.Unmarshal(command.Payload, &input); err != nil {
@@ -326,7 +336,10 @@ func (d *Daemon) createProject(ctx context.Context, input ProjectCreateInput) (P
 func (d *Daemon) joinProject(ctx context.Context, input ProjectJoinInput) (ProjectJoinResult, error) {
 	invitation, err := protocolv2.DecodeInvitation(input.Invitation, time.Now().UTC())
 	if err != nil {
-		return ProjectJoinResult{}, err
+		if errors.Is(err, protocolv2.ErrInvitationExpired) {
+			return ProjectJoinResult{}, failure.Wrap("invite_expired", "This invitation has expired.", false, err)
+		}
+		return ProjectJoinResult{}, failure.Wrap("invalid_invitation", "This invitation is invalid or has been changed.", false, err)
 	}
 	profile, privateKey, err := lanhost.Join(ctx, invitation, input.MemberName, discovery.Discover)
 	if err != nil {
@@ -433,7 +446,7 @@ func (d *Daemon) ask(ctx context.Context, input AskInput) (protocolv2.Response, 
 		return protocolv2.Response{}, err
 	}
 	if payload.Failure != nil {
-		return protocolv2.Response{}, errors.New(payload.Failure.Message)
+		return protocolv2.Response{}, failure.New(payload.Failure.Code, payload.Failure.Message, payload.Failure.Retryable)
 	}
 	if payload.Response == nil {
 		return protocolv2.Response{}, errors.New("Agent returned no response")
@@ -493,11 +506,13 @@ func (d *Daemon) startProvider(agent v2state.LocalAgent) {
 	}
 	providerCtx, cancel := context.WithCancel(d.ctx)
 	d.providers[agent.AgentID] = cancel
+	d.connected[agent.AgentID] = false
 	d.mu.Unlock()
 	go func() {
 		defer func() {
 			d.mu.Lock()
 			delete(d.providers, agent.AgentID)
+			delete(d.connected, agent.AgentID)
 			d.mu.Unlock()
 		}()
 		backoff := time.Second
@@ -507,13 +522,17 @@ func (d *Daemon) startProvider(agent v2state.LocalAgent) {
 				privateKey, keyErr := d.State.PrivateKey(agent.ProjectID)
 				if keyErr == nil {
 					client := d.client(profile, privateKey)
-					_ = client.RunProvider(providerCtx, agent.AgentID, func(requestCtx context.Context, request protocolv2.Request) (protocolv2.Response, *protocolv2.RequestFailure) {
+					_ = client.RunProviderWithState(providerCtx, agent.AgentID, func(requestCtx context.Context, request protocolv2.Request) (protocolv2.Response, *protocolv2.RequestFailure) {
 						answer, runErr := d.Runtime.Read(requestCtx, agent.Repository, request.Body)
 						if runErr != nil {
 							code, message, retryable := publicRuntimeFailure(runErr)
 							return protocolv2.Response{}, &protocolv2.RequestFailure{SchemaVersion: 2, RequestID: request.ID, Code: code, Message: message, Retryable: retryable}
 						}
 						return protocolv2.Response{SchemaVersion: 2, RequestID: request.ID, Status: protocolv2.StatusSucceeded, Answer: answer}, nil
+					}, func(online bool) {
+						d.mu.Lock()
+						d.connected[agent.AgentID] = online
+						d.mu.Unlock()
 					})
 				}
 			}
@@ -545,6 +564,7 @@ func (d *Daemon) stopProvider(agentID string) {
 	d.mu.Lock()
 	cancel := d.providers[agentID]
 	delete(d.providers, agentID)
+	delete(d.connected, agentID)
 	d.mu.Unlock()
 	if cancel != nil {
 		cancel()
@@ -554,12 +574,12 @@ func (d *Daemon) stopProvider(agentID string) {
 func (d *Daemon) writeReply(w http.ResponseWriter, value any, err error) {
 	reply := Reply{OK: err == nil}
 	if err != nil {
-		reply.Error = err.Error()
+		reply.Error = failure.Normalize(err)
 	} else if value != nil {
 		reply.Data, err = json.Marshal(value)
 		if err != nil {
 			reply.OK = false
-			reply.Error = err.Error()
+			reply.Error = failure.Normalize(err)
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")

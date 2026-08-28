@@ -1,98 +1,16 @@
 # PeerContext 开发路线图
 
-本文记录尚未实现、未来可能改进的功能，供维护者和 AI coding 规划工作。它不是当前能力说明，也不是发布承诺；只有完成实现、测试和用户文档更新后，条目才能标记为 `Implemented`。
+本文只记录尚未实现、未来可能改进的功能，供维护者和 AI coding 规划工作。它不是当前能力说明，也不是发布承诺；完成实现、测试和用户文档更新后的条目会从本文删除。
 
-状态定义：`Planned` 表示方向已确认但尚未开始，`In Progress` 表示正在实现，`Implemented` 表示已经通过测试并进入当前文档。
+状态定义：`Planned` 表示方向已确认但尚未开始，`In Progress` 表示正在实现。
 
 ## 当前优先级
 
 | 优先级 | 项目 | 状态 | 目标 |
 |---|---|---|---|
-| P0 | 人类可读输出与 `--json` | Planned | 人直接使用时清楚，Skill 和脚本仍有稳定结构化输出 |
-| P0 | 完整帮助入口 | Planned | 用户不查文档也能发现命令和参数 |
-| P1 | 列表表格与统一格式选项 | Planned | Project、Member 和 Agent 列表更容易浏览 |
-| P1 | 稳定错误码与自救诊断 | Planned | 保留具体失败原因，并给出用户可执行的恢复建议 |
 | P2 | Shell completion | Planned | 补全命令、子命令和静态参数，不补全邀请或敏感信息 |
 | Future | SSH-like 主机直连研究 | Planned | 在不提供产品公网服务的前提下，由目标设备监听并接受已授权成员直连 |
 | Future | Write 协作研究 | Planned | 在 read 模式验证价值后，单独评估安全、可审阅的远程修改流程 |
-
-## CLI-UX-01：人类可读输出与 `--json`
-
-### 当前问题
-
-`peerctx` 当前所有成功和失败都只返回 JSON。它便于 Skill 与脚本调用，但在“创建 Project、复制邀请、让同事加入”的人工流程中显得生硬；回答还需要用户自行从 JSON Base64 中解码。
-
-### 计划方向
-
-- 普通调用默认输出简洁的人类可读文本；
-- 所有公开命令支持全局 `--json`，继续返回稳定的单对象 JSON envelope；
-- `peer-context` Skill 和自动化脚本统一显式传入 `--json`，不依赖终端是否为 TTY；
-- stdout 只放结果，stderr 只放错误，退出码语义保持稳定；
-- `ask` 的 stdin 字节和远端回答字节不能因为展示模式发生变化；
-- 邀请仍只在明确创建邀请的结果中出现，不写入日志或额外诊断。
-
-### 验收条件
-
-1. `peerctx project create --name Demo` 直接显示 Project 已创建、完整邀请、过期时间和下一步；
-2. 同一命令加 `--json` 后仍返回一个可稳定解析的 JSON 对象；
-3. `peerctx ask AGENT` 默认直接显示回答，加 `--json` 后保留结构化结果；
-4. 所有公开命令都有 human/JSON 双模式测试；
-5. 内嵌 Skill、Skill 站点和示例全部显式使用 `--json`；
-6. 非交互管道不会出现颜色、进度动画或混入结果的提示文字。
-
-`--format pretty|json|table|ndjson|csv` 可在真实使用证明有需要后继续设计；P0 先只保证清楚的默认输出和稳定的 `--json`。
-
-## CLI-UX-02：完整帮助入口
-
-### 当前问题
-
-当前 `peerctx --help` 会被当作未知命令并返回 JSON 错误，用户无法在终端中逐层发现正确用法。
-
-### 计划方向
-
-- 支持 `peerctx --help` 和 `peerctx help`；
-- 支持 `peerctx project --help`、`peerctx agent --help` 等命令组帮助；
-- 支持 `peerctx project create --help` 等具体命令帮助；
-- 帮助内容使用人类可读文本，不启动后台服务、不访问网络、不读取 stdin；
-- 参数错误给出简短原因、对应用法和下一步，不打印整页无关内容。
-
-### 验收条件
-
-```text
-peerctx --help
-peerctx project --help
-peerctx project create --help
-```
-
-三条命令都以退出码 `0` 返回对应层级的帮助，不返回 `unknown_command`，也不创建或修改任何 PeerContext 状态。
-
-## CLI-UX-03：列表与状态体验
-
-- `project list`、`project member list` 和 `agent list` 在默认模式下使用对齐、可扫读的列表；
-- `--json` 始终保留完整字段，不因人类展示取舍而丢失数据；
-- `service status` 汇总后台服务、Host、发现和 Agent 状态；
-
-## CLI-UX-04：稳定错误码与自救诊断
-
-### 当前问题
-
-CLI 当前会根据错误文本把具体失败压缩成 `expired`、`conflict`、`unavailable` 等通用错误码。邀请过期、邀请已使用、Project Host 离线和 Agent 离线因此难以准确区分，既影响用户自救，也会让试点记录丢失真实失败原因。
-
-### 计划方向
-
-- 从协议、Host、本地服务到 CLI 保留结构化错误类型，不依赖错误文本匹配来判断已知失败；
-- 对齐 PRD 已定义的稳定错误码，至少覆盖 `invite_expired`、`invite_consumed`、`project_host_offline`、`agent_offline`、`host_identity_mismatch`、`invalid_invitation`、`request_replayed`、`clock_skew` 和 `lan_discovery_unavailable`；
-- 人类可读输出针对具体原因给出下一步，例如重新创建邀请、确认 Host 在线、检查 Agent 所在设备或确认两台 Mac 仍在同一局域网；
-- `--json` 保留稳定的 `error.code`、退出码和 `retryable`，供 Skill、脚本与试点统计可靠处理；
-- 诊断不得建议配置 Relay、公网地址、证书或静态 IP，也不得泄露邀请、私钥、请求正文、回答或本地仓库路径。
-
-### 验收条件
-
-1. 邀请过期与邀请已使用分别返回 `invite_expired` 和 `invite_consumed`，不会合并为通用超时或冲突；
-2. Host 离线与 Agent 离线分别返回 `project_host_offline` 和 `agent_offline`，并给出不同的恢复建议；
-3. 身份不匹配、nonce 重放、时钟偏差和 mDNS 不可用均返回 PRD 对应的稳定错误码；
-4. `peer-context` Skill 按 `error.code` 处理失败，不通过英文错误文本猜测原因，也不把基础设施错误当成仓库事实；
-5. CLI 单元测试和端到端测试覆盖上述错误码、退出码、`retryable` 与敏感信息不泄露。
 
 ## NET-FUTURE-01：SSH-like 用户主机直连研究
 

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -12,6 +13,8 @@ import (
 
 	protocolv2 "github.com/wWzZb/peercontext/pkg/protocol/v2"
 )
+
+var ErrRequestReplayed = errors.New("request replayed")
 
 type replayGuard struct {
 	mu     sync.Mutex
@@ -33,7 +36,7 @@ func (g *replayGuard) Accept(message protocolv2.SignedMessage, now time.Time) er
 		}
 	}
 	if _, exists := g.seen[key]; exists {
-		return errors.New("signed message nonce was already used")
+		return fmt.Errorf("%w: signed message nonce was already used", ErrRequestReplayed)
 	}
 	g.seen[key] = now
 	return nil

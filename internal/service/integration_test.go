@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wWzZb/peercontext/internal/failure"
 	"github.com/wWzZb/peercontext/internal/v2state"
 	protocolv2 "github.com/wWzZb/peercontext/pkg/protocol/v2"
 )
@@ -44,7 +46,13 @@ func TestTwoDeviceLANFirstActivationAndRead(t *testing.T) {
 	hostCancel, hostDone := runTestDaemon(t, hostManager, hostRuntime)
 	defer func() { hostCancel(); <-hostDone }()
 	peerCancel, peerDone := runTestDaemon(t, peerManager, peerRuntime)
-	defer func() { peerCancel(); <-peerDone }()
+	peerStopped := false
+	defer func() {
+		if !peerStopped {
+			peerCancel()
+			<-peerDone
+		}
+	}()
 
 	hostControl := NewControlClient(hostManager.SocketPath())
 	peerControl := NewControlClient(peerManager.SocketPath())
@@ -63,6 +71,9 @@ func TestTwoDeviceLANFirstActivationAndRead(t *testing.T) {
 	}
 	if joined.Project.ID != created.Project.ID {
 		t.Fatalf("joined Project %q, want %q", joined.Project.ID, created.Project.ID)
+	}
+	if err := peerControl.Do(ctx, ActionProjectJoin, ProjectJoinInput{Invitation: created.Invitation, MemberName: "Charlie"}, &ProjectJoinResult{}); failureCode(err) != "invite_consumed" {
+		t.Fatalf("second invitation use code = %q, error = %v", failureCode(err), err)
 	}
 	repository := filepath.Join(root, "peer-repository")
 	if err := os.MkdirAll(repository, 0700); err != nil {
@@ -88,10 +99,10 @@ func TestTwoDeviceLANFirstActivationAndRead(t *testing.T) {
 		t.Fatalf("answer = %q", response.Answer)
 	}
 	peerRuntime.mu.Lock()
-	defer peerRuntime.mu.Unlock()
 	if len(peerRuntime.bodies) != 1 || !bytes.Equal(peerRuntime.bodies[0], requestBody) {
 		t.Fatalf("runtime stdin = %#v", peerRuntime.bodies)
 	}
+	peerRuntime.mu.Unlock()
 	databaseBytes, err := os.ReadFile(hostManager.DatabasePath())
 	if err != nil {
 		t.Fatal(err)
@@ -99,6 +110,31 @@ func TestTwoDeviceLANFirstActivationAndRead(t *testing.T) {
 	if bytes.Contains(databaseBytes, requestBody) || bytes.Contains(databaseBytes, response.Answer) || bytes.Contains(databaseBytes, []byte(repository)) {
 		t.Fatal("host database persisted request, answer, or repository path")
 	}
+
+	peerCancel()
+	if err := <-peerDone; err != nil {
+		t.Fatalf("stop peer daemon: %v", err)
+	}
+	peerStopped = true
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		err := hostControl.Do(ctx, ActionAsk, AskInput{Agent: agent.ID, Body: []byte("offline check"), TimeoutMS: 250}, &protocolv2.Response{})
+		if failureCode(err) == "agent_offline" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("offline Agent code = %q, error = %v", failureCode(err), err)
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+}
+
+func failureCode(err error) string {
+	var structured *failure.Error
+	if errors.As(err, &structured) {
+		return structured.Code
+	}
+	return ""
 }
 
 func runTestDaemon(t *testing.T, manager *v2state.Manager, runtime Runtime) (context.CancelFunc, <-chan error) {

@@ -204,8 +204,11 @@ func (s *Store) ConsumeInvitation(ctx context.Context, request protocolv2.JoinRe
 		return p, ErrInviteExpired
 	}
 	publicKey, err := base64.RawURLEncoding.DecodeString(publicKeyText)
-	if err != nil || len(publicKey) != ed25519.PublicKeySize || request.Verify(ed25519.PublicKey(publicKey), now, protocolv2.DefaultSignatureMaxAge) != nil {
+	if err != nil || len(publicKey) != ed25519.PublicKeySize {
 		return p, ErrInviteInvalid
+	}
+	if err := request.Verify(ed25519.PublicKey(publicKey), now, protocolv2.DefaultSignatureMaxAge); err != nil {
+		return p, err
 	}
 	if len(request.MemberPublicKey) != ed25519.PublicKeySize {
 		return p, ErrInviteInvalid

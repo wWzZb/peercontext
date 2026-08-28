@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/wWzZb/peercontext/internal/failure"
 	protocolv2 "github.com/wWzZb/peercontext/pkg/protocol/v2"
 )
 
@@ -66,17 +66,23 @@ func Join(ctx context.Context, invitation protocolv2.Invitation, memberName stri
 		for _, endpoint := range endpoints {
 			result, err := postJoin(ctx, endpoint, body, invitation.HostPublicKey, request.Nonce)
 			if err != nil {
+				if terminalEndpointError(err) {
+					return Profile{}, nil, err
+				}
 				lastErr = err
 				continue
 			}
 			return Profile{ProjectID: result.Project.ID, ProjectName: result.Project.Name, MemberID: result.Member.ID, MemberName: result.Member.Name, HostPublicKey: invitation.HostPublicKey, Endpoints: prioritizeEndpoint(endpoint, endpoints), Project: result.Project, Member: result.Member}, privateKey, nil
+		}
+		if ctx.Err() != nil {
+			return Profile{}, nil, ctx.Err()
 		}
 		if attempt == 0 && discover != nil {
 			endpoints, lastErr = discover(ctx, invitation.ProjectID, invitation.HostPublicKey)
 		}
 	}
 	if lastErr == nil {
-		lastErr = errors.New("Project host is unavailable on this LAN")
+		lastErr = failure.New("project_host_offline", "The Project host is offline or unreachable on this LAN.", true)
 	}
 	return Profile{}, nil, lastErr
 }
@@ -96,11 +102,14 @@ func postJoin(ctx context.Context, endpoint string, body []byte, hostPublicKey e
 		return result, err
 	}
 	defer response.Body.Close()
-	if response.StatusCode == http.StatusForbidden {
-		return result, errors.New("Project host requires a directly connected LAN peer")
-	}
 	message, rpc, err := decodeSignedResponse(response.Body, hostPublicKey, http.MethodPost, "/v2/join", replyTo)
 	if err != nil {
+		if response.StatusCode == http.StatusForbidden {
+			if terminalEndpointError(err) {
+				return result, err
+			}
+			return result, failure.New("lan_peer_required", "The Project host only accepts directly connected LAN peers.", false)
+		}
 		return result, err
 	}
 	if message.Kind != "join.response" || !rpc.OK {
@@ -110,7 +119,7 @@ func postJoin(ctx context.Context, endpoint string, body []byte, hostPublicKey e
 		return result, err
 	}
 	if result.Project.ID != message.ProjectID || !ed25519.PublicKey(result.Project.HostPublicKey).Equal(hostPublicKey) {
-		return result, errors.New("join response does not match the invitation host")
+		return result, failure.New("host_identity_mismatch", "The responding host does not match the invitation.", false)
 	}
 	return result, nil
 }
@@ -132,11 +141,14 @@ func (c *Client) RPC(ctx context.Context, kind string, input, output any) error 
 		for _, endpoint := range endpoints {
 			rpc, responseMessage, err := c.postRPC(ctx, endpoint, body, message.Nonce)
 			if err != nil {
+				if terminalEndpointError(err) {
+					return err
+				}
 				lastErr = err
 				continue
 			}
 			if responseMessage.ProjectID != c.Profile.ProjectID || responseMessage.Kind != kind+".response" {
-				return errors.New("host response identity does not match request")
+				return failure.New("host_identity_mismatch", "The Project host response does not match the request.", false)
 			}
 			if !rpc.OK {
 				return rpcResultError(rpc)
@@ -147,14 +159,25 @@ func (c *Client) RPC(ctx context.Context, kind string, input, output any) error 
 			}
 			return json.Unmarshal(rpc.Data, output)
 		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if attempt == 0 && c.Discover != nil {
 			endpoints, lastErr = c.Discover(ctx, c.Profile.ProjectID, c.Profile.HostPublicKey)
 		}
 	}
 	if lastErr == nil {
-		lastErr = errors.New("Project host is unavailable on this LAN")
+		lastErr = failure.New("project_host_offline", "The Project host is offline or unreachable on this LAN.", true)
 	}
 	return lastErr
+}
+
+func terminalEndpointError(err error) bool {
+	var structured *failure.Error
+	if !errors.As(err, &structured) {
+		return false
+	}
+	return structured.Code != "project_host_offline" && structured.Code != "lan_discovery_unavailable"
 }
 
 func (c *Client) postRPC(ctx context.Context, endpoint string, body []byte, replyTo string) (RPCResult, protocolv2.SignedMessage, error) {
@@ -172,12 +195,18 @@ func (c *Client) postRPC(ctx context.Context, endpoint string, body []byte, repl
 		return rpc, protocolv2.SignedMessage{}, err
 	}
 	defer response.Body.Close()
-	if response.StatusCode == http.StatusForbidden {
-		return rpc, protocolv2.SignedMessage{}, errors.New("Project host requires a directly connected LAN peer")
-	}
 	message, rpc, err := decodeSignedResponse(response.Body, c.Profile.HostPublicKey, http.MethodPost, "/v2/rpc", replyTo)
+	if err != nil && response.StatusCode == http.StatusForbidden {
+		if terminalEndpointError(err) {
+			return rpc, protocolv2.SignedMessage{}, err
+		}
+		return rpc, protocolv2.SignedMessage{}, failure.New("lan_peer_required", "The Project host only accepts directly connected LAN peers.", false)
+	}
 	if err == nil {
 		err = c.replays.Accept(message, time.Now().UTC())
+		if errors.Is(err, ErrRequestReplayed) {
+			err = failure.Wrap("request_replayed", "The Project host response nonce was already used.", false, err)
+		}
 	}
 	return rpc, message, err
 }
@@ -189,13 +218,16 @@ func decodeSignedResponse(reader io.Reader, hostPublicKey ed25519.PublicKey, met
 		return message, rpc, err
 	}
 	if err := message.Verify(hostPublicKey, time.Now().UTC(), protocolv2.DefaultSignatureMaxAge); err != nil {
-		return message, rpc, fmt.Errorf("verify host response: %w", err)
+		if errors.Is(err, protocolv2.ErrClockSkew) {
+			return message, rpc, failure.Wrap("clock_skew", "The Project host clock differs too much from this Mac.", false, err)
+		}
+		return message, rpc, failure.Wrap("host_identity_mismatch", "The Project host response could not be verified with the saved host key.", false, err)
 	}
 	if message.Method != method || message.Path != path {
-		return message, rpc, errors.New("host response route does not match request")
+		return message, rpc, failure.New("host_identity_mismatch", "The Project host response does not match the request route.", false)
 	}
 	if message.ReplyTo != replyTo {
-		return message, rpc, errors.New("host response does not match the current request")
+		return message, rpc, failure.New("host_identity_mismatch", "The Project host response does not match the current request.", false)
 	}
 	if err := json.Unmarshal(message.Payload, &rpc); err != nil {
 		return message, rpc, err
@@ -224,10 +256,14 @@ func (c *Client) Ask(ctx context.Context, request protocolv2.Request) (protocolv
 type ProviderHandler func(context.Context, protocolv2.Request) (protocolv2.Response, *protocolv2.RequestFailure)
 
 func (c *Client) RunProvider(ctx context.Context, agentID string, handler ProviderHandler) error {
+	return c.RunProviderWithState(ctx, agentID, handler, nil)
+}
+
+func (c *Client) RunProviderWithState(ctx context.Context, agentID string, handler ProviderHandler, onState func(bool)) error {
 	endpoints := c.endpoints()
 	var lastErr error
 	for _, endpoint := range endpoints {
-		err := c.runProviderEndpoint(ctx, endpoint, agentID, handler)
+		err := c.runProviderEndpoint(ctx, endpoint, agentID, handler, onState)
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -239,7 +275,7 @@ func (c *Client) RunProvider(ctx context.Context, agentID string, handler Provid
 	return lastErr
 }
 
-func (c *Client) runProviderEndpoint(ctx context.Context, endpoint, agentID string, handler ProviderHandler) error {
+func (c *Client) runProviderEndpoint(ctx context.Context, endpoint, agentID string, handler ProviderHandler, onState func(bool)) error {
 	if err := requireDirectLANEndpoint(endpoint); err != nil {
 		return err
 	}
@@ -261,6 +297,15 @@ func (c *Client) runProviderEndpoint(ctx context.Context, endpoint, agentID stri
 		return err
 	}
 	defer conn.Close()
+	watchDone := make(chan struct{})
+	defer close(watchDone)
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.Close()
+		case <-watchDone:
+		}
+	}()
 	conn.SetReadLimit(protocolv2.MaxWireMessageBytes)
 	connectedJSON, err := base64.RawURLEncoding.DecodeString(handshake.Header.Get("X-Peerctx-Host-Auth"))
 	if err != nil {
@@ -272,6 +317,10 @@ func (c *Client) runProviderEndpoint(ctx context.Context, endpoint, agentID stri
 	}
 	if err := c.replays.Accept(connected, time.Now().UTC()); err != nil {
 		return err
+	}
+	if onState != nil {
+		onState(true)
+		defer onState(false)
 	}
 	c.rememberEndpoint(endpoint)
 	for {
@@ -349,13 +398,13 @@ func rpcResultError(result RPCResult) error {
 	if result.Error == nil {
 		return errors.New("PeerContext host rejected the request")
 	}
-	return fmt.Errorf("%s: %s", result.Error.Code, result.Error.Message)
+	return failure.New(result.Error.Code, result.Error.Message, result.Error.Retryable)
 }
 
 func requireDirectLANEndpoint(endpoint string) error {
 	parsed, err := url.Parse(endpoint)
 	if err != nil || parsed.Scheme != "http" {
-		return errors.New("Project endpoint is invalid")
+		return failure.New("invalid_invitation", "The Project endpoint in the invitation is invalid.", false)
 	}
 	host := parsed.Hostname()
 	port := parsed.Port()
@@ -363,7 +412,7 @@ func requireDirectLANEndpoint(endpoint string) error {
 		port = "80"
 	}
 	if net.ParseIP(host) == nil || !isDirectLANRemote(net.JoinHostPort(host, port)) {
-		return errors.New("Project endpoint is not on a directly connected LAN")
+		return failure.New("lan_peer_required", "The Project endpoint is not on a directly connected LAN.", false)
 	}
 	return nil
 }

@@ -6,7 +6,7 @@
 
 两台 Apple Silicon Mac 都需要按 [README 安装说明](../../README.md#安装) 完整安装 `peerctx` CLI 和 `peer-context` Skill、安装并登录 Codex CLI，并连接同一个公司或家庭局域网。创建者电脑需要保持登录、在线且不休眠。
 
-以下流程由双方在新的 Codex 对话中显式使用 `$peer-context` 完成。Skill 会调用公开 CLI、解析 JSON 并展示结果；需要直接操作 CLI 时见 [命令参考](./CLI_REFERENCE.md)。
+以下流程由双方在新的 Codex 对话中显式使用 `$peer-context` 完成。Skill 会用 `--json` 调用公开 CLI、解析稳定错误码并展示结果；需要直接操作 CLI 时，默认会看到人类可读输出，详见 [命令参考](./CLI_REFERENCE.md)。
 
 ## 1. 创建 Project
 
@@ -64,11 +64,11 @@ Skill 会选择公开 Manifest 最匹配的 Agent、发送最少必要上下文�
 
 ### 找不到 Project 宿主
 
-确认创建者电脑在线、未休眠，并且两台电脑仍在同一个直接局域网。公司网络禁用 mDNS 时，邀请里的当前 IP 仍可使用；如果 IP 已变化，PeerContext 会明确提示 mDNS 可能被禁用，此时重新创建邀请通常可恢复当前直连地址。
+确认创建者电脑在线、未休眠，并且两台电脑仍在同一个直接局域网。`project_host_offline` 表示创建者当前不可达；`lan_discovery_unavailable` 表示原地址失效后无法通过 mDNS 找回宿主。重新创建邀请可以带上当前直连地址。
 
 ### Agent offline
 
-确认 Agent 所在电脑在线，并运行 `peerctx service status`。正常情况不需要手动 `agent serve`；可用 `peerctx service restart` 做诊断。
+确认 Agent 所在电脑在线，并运行 `peerctx service status`。`agent_offline` 与 Project Host 离线是不同问题。正常情况不需要手动 `agent serve`；可用 `peerctx service restart` 做诊断。
 
 ### 0.1.1 数据不兼容
 

@@ -33,8 +33,8 @@ test("INSTALL.md is a Codex-only task with a mandatory Skill", () => {
   assert.match(guide, /完整安装必须同时包含 `peerctx` CLI 和 `peer-context` Skill/);
   assert.match(guide, /go install \.\/cmd\/peerctx/);
   assert.doesNotMatch(guide, /npm install -g/);
-  assert.match(guide, /peerctx version/);
-  assert.match(guide, /peerctx service status/);
+  assert.match(guide, /peerctx --json version/);
+  assert.match(guide, /peerctx --json service status/);
   assert.doesNotMatch(guide, /peerctx project (?:create|join)/);
   assert.doesNotMatch(guide, /peerctx (?:relay|agent) serve/);
   assert.match(guide, /`\$peer-context` 显式/);

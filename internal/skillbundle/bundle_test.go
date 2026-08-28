@@ -49,7 +49,7 @@ func TestSkillIsExplicitInteractiveAndUsesCompletePublicCLI(t *testing.T) {
 		}
 	}
 	contract, _ := Read("references/cli-contract.md")
-	for _, command := range []string{"peerctx project create", "peerctx project join", "peerctx project member remove", "peerctx agent register", "peerctx agent remove", "peerctx ask", "peerctx service status", "peerctx skills read", "peerctx version"} {
+	for _, command := range []string{"peerctx --json project create", "peerctx --json project join", "peerctx --json project member remove", "peerctx --json agent register", "peerctx --json agent remove", "peerctx --json ask", "peerctx --json service status", "peerctx --json skills read", "peerctx --json version"} {
 		if !bytes.Contains(contract, []byte(command)) {
 			t.Fatalf("Skill CLI contract missing public command %q", command)
 		}

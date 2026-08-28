@@ -78,12 +78,12 @@ func (s *Server) handleJoin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if request.Method != http.MethodPost || request.Path != "/v2/join" {
-		s.writeSigned(w, request.ProjectID, "join.response", http.MethodPost, "/v2/join", request.Nonce, rpcFailure("join_rejected", errors.New("join signature route mismatch"), false), http.StatusForbidden)
+		s.writeSigned(w, request.ProjectID, "join.response", http.MethodPost, "/v2/join", request.Nonce, rpcFailure("invalid_invitation", errors.New("join signature route mismatch"), false), http.StatusForbidden)
 		return
 	}
 	project, err := s.Store.ConsumeInvitation(r.Context(), request, s.Now().UTC())
 	if err != nil {
-		s.writeSigned(w, request.ProjectID, "join.response", http.MethodPost, "/v2/join", request.Nonce, rpcFailure("join_rejected", err, false), http.StatusForbidden)
+		s.writeSigned(w, request.ProjectID, "join.response", http.MethodPost, "/v2/join", request.Nonce, rpcFailureFor("invalid_invitation", err, false), http.StatusForbidden)
 		return
 	}
 	member, err := s.Store.Member(r.Context(), request.ProjectID, memberIDFromPublicKey(request.MemberPublicKey))
@@ -103,7 +103,7 @@ func (s *Server) handleRPC(w http.ResponseWriter, r *http.Request) {
 	}
 	member, err := s.authenticate(r.Context(), message, http.MethodPost, "/v2/rpc")
 	if err != nil {
-		s.writeSigned(w, message.ProjectID, message.Kind+".response", http.MethodPost, "/v2/rpc", message.Nonce, rpcFailure("unauthorized", err, false), http.StatusUnauthorized)
+		s.writeSigned(w, message.ProjectID, message.Kind+".response", http.MethodPost, "/v2/rpc", message.Nonce, rpcFailureFor("authorization_failed", err, false), http.StatusUnauthorized)
 		return
 	}
 	result, status := s.dispatchRPC(r.Context(), member, message)
@@ -231,7 +231,7 @@ func (s *Server) ask(ctx context.Context, member protocolv2.Member, message prot
 	response, err := s.broker.dispatch(ctx, request, identity)
 	if err != nil {
 		_ = s.Store.UpdateRequest(context.Background(), request.ProjectID, request.ID, protocolv2.StatusFailed, s.Now().UTC())
-		return rpcFailure("agent_unavailable", err, true), http.StatusServiceUnavailable
+		return rpcFailure("agent_offline", err, true), http.StatusServiceUnavailable
 	}
 	status := protocolv2.StatusSucceeded
 	if response.Type == protocolv2.ProviderFailure {
@@ -328,7 +328,7 @@ func (s *Server) writeSigned(w http.ResponseWriter, projectID, kind, method, pat
 
 func encodeResult(value any, err error) (RPCResult, int) {
 	if err != nil {
-		return rpcFailure("operation_failed", err, false), http.StatusBadRequest
+		return rpcFailureFor("operation_failed", err, false), http.StatusBadRequest
 	}
 	data, marshalErr := json.Marshal(value)
 	if marshalErr != nil {
@@ -339,6 +339,29 @@ func encodeResult(value any, err error) (RPCResult, int) {
 
 func rpcFailure(code string, err error, retryable bool) RPCResult {
 	return RPCResult{OK: false, Error: &RPCError{Code: code, Message: err.Error(), Retryable: retryable}}
+}
+
+func rpcFailureFor(defaultCode string, err error, retryable bool) RPCResult {
+	switch {
+	case errors.Is(err, ErrInviteExpired):
+		return rpcFailure("invite_expired", err, false)
+	case errors.Is(err, ErrInviteConsumed):
+		return rpcFailure("invite_consumed", err, false)
+	case errors.Is(err, ErrInviteInvalid):
+		return rpcFailure("invalid_invitation", err, false)
+	case errors.Is(err, ErrRequestReplayed):
+		return rpcFailure("request_replayed", err, false)
+	case errors.Is(err, protocolv2.ErrClockSkew):
+		return rpcFailure("clock_skew", err, false)
+	case errors.Is(err, protocolv2.ErrSignatureInvalid):
+		return rpcFailure("signature_invalid", err, false)
+	case errors.Is(err, ErrMemberForbidden):
+		return rpcFailure("authorization_failed", err, false)
+	case errors.Is(err, ErrNotFound):
+		return rpcFailure("not_found", err, false)
+	default:
+		return rpcFailure(defaultCode, err, retryable)
+	}
 }
 
 func decodeJSON(reader io.Reader, target any, limit int64) error {

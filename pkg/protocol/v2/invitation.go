@@ -24,19 +24,19 @@ type Invitation struct {
 
 func (i Invitation) Validate(now time.Time) error {
 	if i.SchemaVersion != SchemaVersion || i.ProtocolVersion != ProtocolVersion {
-		return errors.New("unsupported invitation version")
+		return fmt.Errorf("%w: unsupported version", ErrInvalidInvitation)
 	}
 	if i.ProjectID == "" || strings.TrimSpace(i.ProjectName) == "" || i.InviteID == "" {
-		return errors.New("invitation identity is incomplete")
+		return fmt.Errorf("%w: identity is incomplete", ErrInvalidInvitation)
 	}
 	if len(i.Endpoints) == 0 {
-		return errors.New("invitation has no LAN endpoint")
+		return fmt.Errorf("%w: no LAN endpoint", ErrInvalidInvitation)
 	}
 	if len(i.HostPublicKey) != ed25519.PublicKeySize || len(i.InvitePrivateKey) != ed25519.PrivateKeySize {
-		return errors.New("invitation key material is invalid")
+		return fmt.Errorf("%w: key material is invalid", ErrInvalidInvitation)
 	}
 	if !i.ExpiresAt.After(now) {
-		return errors.New("invitation has expired")
+		return fmt.Errorf("%w: invitation has expired", ErrInvitationExpired)
 	}
 	return nil
 }
@@ -55,14 +55,14 @@ func EncodeInvitation(invitation Invitation) (string, error) {
 func DecodeInvitation(value string, now time.Time) (Invitation, error) {
 	var invitation Invitation
 	if !strings.HasPrefix(value, InvitationPrefix) {
-		return invitation, errors.New("invalid invitation prefix")
+		return invitation, fmt.Errorf("%w: invalid prefix", ErrInvalidInvitation)
 	}
 	data, err := base64.RawURLEncoding.DecodeString(strings.TrimPrefix(value, InvitationPrefix))
 	if err != nil {
-		return invitation, fmt.Errorf("decode invitation: %w", err)
+		return invitation, fmt.Errorf("%w: decode invitation: %v", ErrInvalidInvitation, err)
 	}
 	if err = json.Unmarshal(data, &invitation); err != nil {
-		return invitation, fmt.Errorf("parse invitation: %w", err)
+		return invitation, fmt.Errorf("%w: parse invitation: %v", ErrInvalidInvitation, err)
 	}
 	if err = invitation.Validate(now); err != nil {
 		return Invitation{}, err
@@ -99,10 +99,10 @@ func (j JoinRequest) Verify(publicKey ed25519.PublicKey, now time.Time, maxAge t
 		return errors.New("member public key is invalid")
 	}
 	if delta := now.Sub(j.Timestamp); delta > maxAge || delta < -maxAge {
-		return errors.New("join request clock skew exceeds limit")
+		return fmt.Errorf("%w: join request exceeds limit", ErrClockSkew)
 	}
 	if !ed25519.Verify(publicKey, j.signingBytes(), j.Signature) {
-		return errors.New("join request signature is invalid")
+		return fmt.Errorf("%w: join request", ErrSignatureInvalid)
 	}
 	return nil
 }

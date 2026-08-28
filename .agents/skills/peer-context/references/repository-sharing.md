@@ -31,10 +31,10 @@ Obtain explicit confirmation after showing this preview. Do not treat permission
 After confirmation, call only the public command:
 
 ```text
-peerctx agent register REPOSITORY [--name NAME] [--summary TEXT]
+peerctx --json agent register REPOSITORY [--name NAME] [--summary TEXT]
                        [--tags CSV] [--capabilities CSV]
 ```
 
-Parse the JSON envelope, then verify the returned Agent or call `peerctx agent get AGENT`. Report its public name, owner, and online state. Do not expose the local path in output intended for other Project members.
+Parse the JSON envelope, then verify the returned Agent or call `peerctx --json agent get AGENT`. Report its public name, owner, and online state. Do not expose the local path in output intended for other Project members.
 
 There is no public Agent update command. Changing published metadata currently requires removing and registering the Agent again; explain the interruption and obtain confirmation before removal.

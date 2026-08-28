@@ -3,6 +3,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/signal"
@@ -27,6 +28,10 @@ type VersionData struct {
 // separate stream so ask/task forward bytes without turning them into command
 // arguments or strings.
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) clioutput.ExitCode {
+	args, jsonOutput := parseGlobalArgs(args)
+	if wantsHelp(args) {
+		return writeHelp(stdout, args)
+	}
 	if len(args) == 1 && (args[0] == "version" || args[0] == "--version") {
 		data := VersionData{
 			SchemaVersion: protocolv2.SchemaVersion,
@@ -34,7 +39,11 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) clioutput.Exi
 			Protocol:      protocolv2.ProtocolVersion,
 			RuntimeMode:   "isolated_runtime",
 		}
-		if err := clioutput.WriteSuccess(stdout, data, clioutput.Meta{Version: version.Current}); err != nil {
+		if jsonOutput {
+			if err := clioutput.WriteSuccess(stdout, data, clioutput.Meta{Version: version.Current}); err != nil {
+				return clioutput.ExitInternal
+			}
+		} else if _, err := fmt.Fprintf(stdout, "peerctx %s\nProtocol: %s\nRuntime: %s\n", data.Version, data.Protocol, data.RuntimeMode); err != nil {
 			return clioutput.ExitInternal
 		}
 		return clioutput.ExitOK
@@ -42,17 +51,17 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) clioutput.Exi
 	if len(args) == 1 && args[0] == "_service-run" {
 		manager, err := v2state.DefaultManager()
 		if err != nil {
-			return writeMappedError(stderr, err)
+			return writeMappedError(stderr, err, jsonOutput)
 		}
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
 		if err := service.NewDaemon(manager, nil).Run(ctx); err != nil {
-			return writeMappedError(stderr, err)
+			return writeMappedError(stderr, err, jsonOutput)
 		}
 		return clioutput.ExitOK
 	}
 	if len(args) > 0 {
-		return runV2(context.Background(), args, stdin, stdout, stderr)
+		return runV2(context.Background(), args, stdin, stdout, stderr, jsonOutput)
 	}
 
 	apiErr := clioutput.NewError(
@@ -64,8 +73,5 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer) clioutput.Exi
 		"Run peerctx project create, project join, agent register, ask, service status, or version.",
 		false,
 	)
-	if err := clioutput.WriteError(stderr, apiErr); err != nil {
-		return clioutput.ExitInternal
-	}
-	return apiErr.ExitCode()
+	return writeError(stderr, apiErr, jsonOutput)
 }

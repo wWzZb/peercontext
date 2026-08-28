@@ -6,8 +6,6 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -17,6 +15,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/mdns"
+	"github.com/wWzZb/peercontext/internal/failure"
 	protocolv2 "github.com/wWzZb/peercontext/pkg/protocol/v2"
 )
 
@@ -73,11 +72,11 @@ func Discover(ctx context.Context, projectID string, hostPublicKey ed25519.Publi
 			}
 		case err := <-queryDone:
 			if err != nil && len(candidates) == 0 {
-				return nil, fmt.Errorf("mDNS discovery failed: %w", err)
+				return nil, failure.Wrap("lan_discovery_unavailable", "LAN discovery is unavailable on this network.", true, err)
 			}
 			valid := validateCandidates(ctx, candidates, projectID, hostPublicKey)
 			if len(valid) == 0 {
-				return nil, errors.New("could not rediscover the Project host; mDNS may be blocked on this network")
+				return nil, failure.New("project_host_offline", "The Project host is offline or was not found on this LAN.", true)
 			}
 			return valid, nil
 		}

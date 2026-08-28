@@ -50,10 +50,10 @@ func (m SignedMessage) Verify(publicKey ed25519.PublicKey, now time.Time, maxAge
 		return errors.New("public key is invalid")
 	}
 	if delta := now.Sub(m.Timestamp); delta > maxAge || delta < -maxAge {
-		return errors.New("signed message clock skew exceeds limit")
+		return fmt.Errorf("%w: signed message exceeds limit", ErrClockSkew)
 	}
 	if !ed25519.Verify(publicKey, m.signingBytes(), m.Signature) {
-		return errors.New("signed message signature is invalid")
+		return fmt.Errorf("%w: signed message", ErrSignatureInvalid)
 	}
 	return nil
 }

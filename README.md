@@ -96,7 +96,7 @@ peerctx version
 peerctx service status
 ```
 
-尚未使用 PeerContext 时，`service status` 返回 `running:false` 是正常的。打开一个新的 Codex 对话并显式使用 Skill：
+尚未使用 PeerContext 时，`service status` 显示服务尚未运行是正常的。打开一个新的 Codex 对话并显式使用 Skill：
 
 ```text
 $peer-context 帮我查看当前 PeerContext 状态

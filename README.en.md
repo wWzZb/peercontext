@@ -96,7 +96,7 @@ peerctx version
 peerctx service status
 ```
 
-Before you have used PeerContext, it is normal for `service status` to return `running:false`. Open a new Codex conversation and explicitly invoke the Skill:
+Before you have used PeerContext, it is normal for `service status` to show that the service is stopped. Open a new Codex conversation and explicitly invoke the Skill:
 
 ```text
 $peer-context Check my current PeerContext status

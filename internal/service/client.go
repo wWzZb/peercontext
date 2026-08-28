@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net"
 	"net/http"
 	"time"
+
+	"github.com/wWzZb/peercontext/internal/failure"
 )
 
 type ControlClient struct {
@@ -42,10 +43,10 @@ func (c *ControlClient) Do(ctx context.Context, action string, input, output any
 		return err
 	}
 	if !reply.OK {
-		if reply.Error == "" {
-			reply.Error = "PeerContext service rejected the command"
+		if reply.Error == nil {
+			return failure.New("peerctx_error", "PeerContext service rejected the command.", false)
 		}
-		return errors.New(reply.Error)
+		return reply.Error
 	}
 	if output == nil || len(reply.Data) == 0 {
 		return nil

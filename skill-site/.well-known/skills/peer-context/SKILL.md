@@ -5,7 +5,7 @@ description: Help Codex explicitly operate the complete public PeerContext LAN C
 
 # PeerContext
 
-Use only the public `peerctx` CLI. In the user's normal interactive workspace, translate their intent into the documented command, inspect local repository information when needed, parse the JSON envelope, and explain the result. The CLI remains an infrastructure layer and does not inspect repositories or infer semantics.
+Use only the public `peerctx` CLI. Every invocation must include the global `--json` option so output remains machine-readable. In the user's normal interactive workspace, translate their intent into the documented command, inspect local repository information when needed, parse the JSON envelope, and explain the result. The CLI remains an infrastructure layer and does not inspect repositories or infer semantics.
 
 ## Route the task
 

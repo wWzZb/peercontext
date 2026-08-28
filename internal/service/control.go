@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/wWzZb/peercontext/internal/failure"
 	protocolv2 "github.com/wWzZb/peercontext/pkg/protocol/v2"
 )
 
@@ -10,9 +11,9 @@ type Command struct {
 }
 
 type Reply struct {
-	OK    bool   `json:"ok"`
-	Data  []byte `json:"data,omitempty"`
-	Error string `json:"error,omitempty"`
+	OK    bool           `json:"ok"`
+	Data  []byte         `json:"data,omitempty"`
+	Error *failure.Error `json:"error,omitempty"`
 }
 
 type ProjectCreateInput struct {
