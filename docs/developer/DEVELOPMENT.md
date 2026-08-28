@@ -2,7 +2,7 @@
 
 ## 开发边界
 
-开始修改前完整阅读 [PRD](./PRD.md) 和 [Runtime Spike 结果](../spikes/codex-runtime/RESULT.md)。
+开始修改前完整阅读 [PRD](../product/PRD.md) 和 [Runtime Spike 结果](../../spikes/codex-runtime/RESULT.md)。当前命令与实现行为以代码和测试为准；未来计划见 [开发路线图](./ROADMAP.md)，不得把计划当成已实现能力。
 
 - CLI 与 `peer-context` Skill 是独立层；CLI 不理解请求语义，不读仓库，不改写提示词。
 - Skill 只显式触发，覆盖全部公开 CLI；它可以在正常工作环境中理解用户意图和仓库语义，但不直接调用后台内部接口，也不进入提供端入站 Codex。
@@ -23,23 +23,6 @@ go install ./cmd/peerctx
 ```
 
 `0.2.0` 未发布，不使用 npm 或 GitHub Release 安装。
-
-## 目录
-
-```text
-cmd/peerctx/                  CLI 入口
-internal/cli/                 v2 公共命令与 JSON 输出
-internal/service/             后台服务、Unix socket、LaunchAgent
-internal/lanhost/             签名 LAN HTTP/WS、Project Store、Agent broker
-internal/discovery/           _peerctx._tcp mDNS 广播与验证发现
-internal/v2state/             独立 v2 本机状态与 Keychain
-internal/codex/               read-only isolated_runtime
-internal/skillbundle/         嵌入式 Skill
-pkg/protocol/v2/              v2 协议对象、邀请与签名
-.agents/skills/peer-context/  Skill 源文件
-```
-
-v1 Relay、credential、write 和 worktree 实现已从当前代码删除。旧用户状态保留在 v1 目录，不迁移也不删除。
 
 ## 运行与调试
 

@@ -4,7 +4,7 @@
 
 ## 开始之前
 
-两台 Apple Silicon Mac 都需要安装 `peerctx 0.2.0` 源码版本、安装并登录 Codex CLI，并连接同一个公司或家庭局域网。创建者电脑需要保持登录、在线且不休眠。
+两台 Apple Silicon Mac 都需要按 [README 安装说明](../../README.md#安装) 完整安装 `peerctx` CLI 和 `peer-context` Skill、安装并登录 Codex CLI，并连接同一个公司或家庭局域网。创建者电脑需要保持登录、在线且不休眠。
 
 ## 1. 创建 Project
 
