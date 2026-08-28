@@ -31,7 +31,7 @@ func TestTwoDeviceLANFirstActivationAndRead(t *testing.T) {
 	t.Setenv("PEERCTX_ALLOW_UNSUPPORTED", "1")
 	t.Setenv("PEERCTX_DISABLE_MDNS", "1")
 	t.Setenv("PEERCTX_INCLUDE_LOOPBACK", "1")
-	root, err := os.MkdirTemp("/private/tmp", "pc2-")
+	root, err := os.MkdirTemp("", "pc2-")
 	if err != nil {
 		t.Fatal(err)
 	}
