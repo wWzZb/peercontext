@@ -1,0 +1,234 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release (without the v prefix)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release v${{ inputs.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Select and validate release source
+        id: release
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if ! printf '%s' "${INPUT_VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?(\+[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$'; then
+            echo "Version must be a valid SemVer value without a v prefix." >&2
+            exit 1
+          fi
+
+          tag="v${INPUT_VERSION}"
+          git fetch --force --tags origin
+          if tag_sha="$(git rev-list -n 1 "${tag}" 2>/dev/null)" && [ -n "${tag_sha}" ]; then
+            target_sha="${tag_sha}"
+            source_kind="existing tag"
+          else
+            if [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+              echo "A new release must be dispatched from the main branch." >&2
+              exit 1
+            fi
+            target_sha="${GITHUB_SHA}"
+            source_kind="main"
+          fi
+
+          git checkout --detach "${target_sha}"
+          package_name="$(node -p "require('./package.json').name")"
+          package_version="$(node -p "require('./package.json').version")"
+          if [ "${package_name}" != "peerctx" ]; then
+            echo "Unexpected package name: ${package_name}." >&2
+            exit 1
+          fi
+          if [ "${INPUT_VERSION}" != "${package_version}" ]; then
+            echo "Requested version ${INPUT_VERSION} does not match package.json version ${package_version}." >&2
+            exit 1
+          fi
+
+          if [[ "${INPUT_VERSION}" == *-* ]]; then
+            npm_tag="next"
+            github_prerelease="true"
+          else
+            npm_tag="latest"
+            github_prerelease="false"
+          fi
+
+          echo "version=${INPUT_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          echo "target_sha=${target_sha}" >> "${GITHUB_OUTPUT}"
+          echo "npm_tag=${npm_tag}" >> "${GITHUB_OUTPUT}"
+          echo "github_prerelease=${github_prerelease}" >> "${GITHUB_OUTPUT}"
+          echo "Using ${source_kind} at ${target_sha}; npm dist-tag will be ${npm_tag}."
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run release checks
+        run: |
+          set -euo pipefail
+          test -z "$(gofmt -l .)"
+          go test ./...
+          go test -race ./...
+          go vet ./...
+          npm test
+          git diff --check
+
+      - name: Build and verify release assets
+        id: package
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          vendor_dir="vendor/darwin-arm64"
+          stage_dir="staging/peerctx-v${RELEASE_VERSION}-darwin-arm64"
+          archive="dist/peerctx-v${RELEASE_VERSION}-darwin-arm64.tar.gz"
+          tarball="dist/peerctx-${RELEASE_VERSION}.tgz"
+          mkdir -p "${vendor_dir}" "${stage_dir}" dist
+
+          GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 \
+            go build -mod=readonly -trimpath -o "${vendor_dir}/peerctx" ./cmd/peerctx
+          cp "${vendor_dir}/peerctx" "${stage_dir}/peerctx"
+          tar -C "${stage_dir}" -czf "${archive}" peerctx
+
+          node scripts/generate-checksums.js
+          node scripts/verify-package.js
+          npm pack --pack-destination dist
+          test -f "${tarball}"
+
+          install_dir="$(mktemp -d)"
+          npm install --prefix "${install_dir}" "${tarball}"
+          "${install_dir}/node_modules/.bin/peerctx" version | grep -F "peerctx ${RELEASE_VERSION}"
+
+          (
+            cd dist
+            sha256sum \
+              "peerctx-${RELEASE_VERSION}.tgz" \
+              "peerctx-v${RELEASE_VERSION}-darwin-arm64.tar.gz" \
+              > SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+
+          echo "tarball=${tarball}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: peerctx-v${{ steps.release.outputs.version }}-release-assets
+          path: dist/
+          if-no-files-found: error
+
+      - name: Create or verify GitHub release
+        id: github_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          TARGET_SHA: ${{ steps.release.outputs.target_sha }}
+          GITHUB_PRERELEASE: ${{ steps.release.outputs.github_prerelease }}
+          BUILT_TARBALL: ${{ steps.package.outputs.tarball }}
+        run: |
+          set -euo pipefail
+
+          package_asset="peerctx-${RELEASE_VERSION}.tgz"
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            release_prerelease="$(gh release view "${RELEASE_TAG}" --json isPrerelease --jq '.isPrerelease')"
+            tag_sha="$(git rev-list -n 1 "${RELEASE_TAG}")"
+            if [ "${tag_sha}" != "${TARGET_SHA}" ]; then
+              echo "Existing tag ${RELEASE_TAG} points to ${tag_sha}, expected ${TARGET_SHA}." >&2
+              exit 1
+            fi
+            if [ "${release_prerelease}" != "${GITHUB_PRERELEASE}" ]; then
+              echo "Existing GitHub release prerelease state does not match ${RELEASE_VERSION}." >&2
+              exit 1
+            fi
+
+            mkdir -p published-assets
+            gh release download "${RELEASE_TAG}" --dir published-assets
+            for asset in "${package_asset}" "peerctx-v${RELEASE_VERSION}-darwin-arm64.tar.gz" SHA256SUMS; do
+              test -f "published-assets/${asset}"
+            done
+            (cd published-assets && sha256sum --check SHA256SUMS)
+            publish_tarball="published-assets/${package_asset}"
+            echo "Reusing the verified package from the existing GitHub release."
+          else
+            prerelease_args=()
+            if [ "${GITHUB_PRERELEASE}" = "true" ]; then
+              prerelease_args+=(--prerelease)
+            fi
+            gh release create "${RELEASE_TAG}" dist/* \
+              --target "${TARGET_SHA}" \
+              --title "PeerContext ${RELEASE_TAG}" \
+              --generate-notes \
+              "${prerelease_args[@]}"
+            publish_tarball="${BUILT_TARBALL}"
+          fi
+
+          package_version="$(tar -xOf "${publish_tarball}" package/package.json | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(data).version));")"
+          if [ "${package_version}" != "${RELEASE_VERSION}" ]; then
+            echo "Package asset version ${package_version} does not match ${RELEASE_VERSION}." >&2
+            exit 1
+          fi
+
+          install_dir="$(mktemp -d)"
+          npm install --prefix "${install_dir}" "${publish_tarball}"
+          "${install_dir}/node_modules/.bin/peerctx" version | grep -F "peerctx ${RELEASE_VERSION}"
+          echo "publish_tarball=${publish_tarball}" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish package to npmjs
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          NPM_TAG: ${{ steps.release.outputs.npm_tag }}
+          PUBLISH_TARBALL: ${{ steps.github_release.outputs.publish_tarball }}
+        run: |
+          set -euo pipefail
+
+          if npm view "peerctx@${RELEASE_VERSION}" version >/dev/null 2>&1; then
+            registry_dir="$(mktemp -d)"
+            npm pack "peerctx@${RELEASE_VERSION}" --pack-destination "${registry_dir}"
+            cmp "${PUBLISH_TARBALL}" "${registry_dir}/peerctx-${RELEASE_VERSION}.tgz"
+            echo "peerctx@${RELEASE_VERSION} is already published with identical bytes."
+          else
+            npm publish "${PUBLISH_TARBALL}" --access public --tag "${NPM_TAG}"
+          fi
+
+      - name: Show release result
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          NPM_TAG: ${{ steps.release.outputs.npm_tag }}
+        run: |
+          set -euo pipefail
+          gh release view "${RELEASE_TAG}" --json url --jq '.url'
+          npm view "peerctx@${RELEASE_VERSION}" version
+          npm view peerctx dist-tags --json

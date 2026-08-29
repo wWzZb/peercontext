@@ -70,3 +70,5 @@ npm test
 ## 发布门禁
 
 `0.2.0-alpha.*` 可作为明确标记的预发布用于测试。`0.2.0` 正式发布前还需要在真实 Apple Silicon Mac 上完成 LaunchAgent 安装/重启/登录恢复、真实隔离 Codex smoke，以及 10 组双人首次激活试点中至少 8 组在 5 分钟内完成且无手工网络配置。
+
+预发布和正式发布都从 GitHub Actions 的 `Release` 工作流手动发起，输入与 `package.json` 一致且不带 `v` 的版本号。工作流只构建当前支持的 `darwin-arm64` 包，运行完整测试，生成并验证二进制校验和，创建 Git tag 与 GitHub Release，然后通过 npm Trusted Publishing 发布；预发布自动使用 npm 的 `next` dist-tag，正式版使用 `latest`。如果 GitHub Release 已创建但 npm 发布未完成，同一版本可以安全重跑，工作流会复用并验证已有 Release 资产。
