@@ -11,6 +11,10 @@ const workflow = fs.readFileSync(path.join(root, ".github", "workflows", "releas
 test("release workflow publishes the single supported package with trusted publishing", () => {
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /id-token: write/);
+  assert.match(workflow, /actions\/checkout@v7/);
+  assert.match(workflow, /actions\/setup-go@v7/);
+  assert.match(workflow, /actions\/setup-node@v7/);
+  assert.match(workflow, /actions\/upload-artifact@v7/);
   assert.match(workflow, /node-version: 24/);
   assert.match(workflow, /package-manager-cache: false/);
   assert.match(workflow, /GOOS=darwin GOARCH=arm64 CGO_ENABLED=0/);
@@ -28,4 +32,5 @@ test("release workflow can safely resume an existing GitHub release", () => {
   assert.match(workflow, /sha256sum --check SHA256SUMS/);
   assert.match(workflow, /npm view "peerctx@\$\{RELEASE_VERSION\}" version/);
   assert.match(workflow, /cmp "\$\{PUBLISH_TARBALL\}"/);
+  assert.match(workflow, /for attempt in 1 2 3 4 5 6/);
 });

@@ -21,16 +21,16 @@ jobs:
     name: Release v${{ inputs.version }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
@@ -145,7 +145,7 @@ jobs:
           echo "tarball=${tarball}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload workflow artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: peerctx-v${{ steps.release.outputs.version }}-release-assets
           path: dist/
@@ -238,5 +238,18 @@ jobs:
         run: |
           set -euo pipefail
           gh release view "${RELEASE_TAG}" --json url --jq '.url'
-          npm view "peerctx@${RELEASE_VERSION}" version
+
+          for attempt in 1 2 3 4 5 6; do
+            if published_version="$(npm view "peerctx@${RELEASE_VERSION}" version 2>/dev/null)" && \
+              [ "${published_version}" = "${RELEASE_VERSION}" ]; then
+              echo "${published_version}"
+              break
+            fi
+            if [ "${attempt}" -eq 6 ]; then
+              echo "npm did not expose peerctx@${RELEASE_VERSION} after repeated checks." >&2
+              exit 1
+            fi
+            sleep 5
+          done
+
           npm view peerctx dist-tags --json
