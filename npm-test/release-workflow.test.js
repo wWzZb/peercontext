@@ -15,6 +15,8 @@ test("release workflow publishes the single supported package with trusted publi
   assert.match(workflow, /package-manager-cache: false/);
   assert.match(workflow, /GOOS=darwin GOARCH=arm64 CGO_ENABLED=0/);
   assert.doesNotMatch(workflow, /GOOS=(?:linux|windows)|GOARCH=amd64|win32-/);
+  assert.match(workflow, /tarball="\$\(realpath "\$\{tarball\}"\)"/);
+  assert.match(workflow, /publish_tarball="\$\(realpath "\$\{publish_tarball\}"\)"/);
   assert.match(workflow, /npm publish "\$\{PUBLISH_TARBALL\}" --access public --tag "\$\{NPM_TAG\}"/);
   assert.doesNotMatch(workflow, /NPM_TOKEN|NODE_AUTH_TOKEN/);
 });

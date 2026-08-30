@@ -124,6 +124,7 @@ jobs:
           node scripts/verify-package.js
           npm pack --pack-destination dist
           test -f "${tarball}"
+          tarball="$(realpath "${tarball}")"
 
           install_dir="$(mktemp -d)"
           npm install --prefix "${install_dir}" "${tarball}"
@@ -193,6 +194,7 @@ jobs:
             publish_tarball="${BUILT_TARBALL}"
           fi
 
+          publish_tarball="$(realpath "${publish_tarball}")"
           package_version="$(tar -xOf "${publish_tarball}" package/package.json | node -e "let data=''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(data).version));")"
           if [ "${package_version}" != "${RELEASE_VERSION}" ]; then
             echo "Package asset version ${package_version} does not match ${RELEASE_VERSION}." >&2
