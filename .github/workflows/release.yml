@@ -128,7 +128,10 @@ jobs:
 
           install_dir="$(mktemp -d)"
           npm install --prefix "${install_dir}" "${tarball}"
-          "${install_dir}/node_modules/.bin/peerctx" version | grep -F "peerctx ${RELEASE_VERSION}"
+          host_binary="${install_dir}/peerctx-host"
+          go build -mod=readonly -trimpath -o "${host_binary}" ./cmd/peerctx
+          PEERCTX_BINARY="${host_binary}" \
+            "${install_dir}/node_modules/.bin/peerctx" version | grep -F "peerctx ${RELEASE_VERSION}"
 
           (
             cd dist
@@ -203,7 +206,10 @@ jobs:
 
           install_dir="$(mktemp -d)"
           npm install --prefix "${install_dir}" "${publish_tarball}"
-          "${install_dir}/node_modules/.bin/peerctx" version | grep -F "peerctx ${RELEASE_VERSION}"
+          host_binary="${install_dir}/peerctx-host"
+          go build -mod=readonly -trimpath -o "${host_binary}" ./cmd/peerctx
+          PEERCTX_BINARY="${host_binary}" \
+            "${install_dir}/node_modules/.bin/peerctx" version | grep -F "peerctx ${RELEASE_VERSION}"
           echo "publish_tarball=${publish_tarball}" >> "${GITHUB_OUTPUT}"
 
       - name: Publish package to npmjs
